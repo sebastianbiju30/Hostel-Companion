@@ -1,5 +1,7 @@
 package com.example.hostel_companion.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -16,19 +18,71 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.hostel_companion.data.SupabaseProvider
+import com.example.hostel_companion.data.models.*
 import com.example.hostel_companion.ui.theme.*
+import io.github.jan.supabase.postgrest.from
+import kotlinx.coroutines.launch
 
 @Composable
 fun DashboardScreen(navController: NavController) {
+    val context = LocalContext.current
     val user = SupabaseProvider.auth.currentUserOrNull()
     val userName = user?.email?.substringBefore("@")?.replaceFirstChar { it.uppercase() } ?: "Sebastian"
 
+    var roomNumber by remember { mutableStateOf("A-304") }
+    var messBalance by remember { mutableStateOf("₹2,450") }
+    var activeComplaint by remember { mutableStateOf<Complaint?>(null) }
+    var latestNotice by remember { mutableStateOf<Notice?>(null) }
+    var latestVisitor by remember { mutableStateOf<Visitor?>(null) }
+    var emergencyContacts by remember { mutableStateOf<List<EmergencyContact>>(emptyList()) }
+
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        scope.launch {
+            try {
+                val userId = user?.id ?: ""
+                val profile = SupabaseProvider.db.from("profiles")
+                    .select { filter { eq("id", userId) } }
+                    .decodeSingleOrNull<UserProfile>()
+                if (profile?.roomId != null) {
+                    val room = SupabaseProvider.db.from("rooms")
+                        .select { filter { eq("id", profile.roomId) } }
+                        .decodeSingleOrNull<Room>()
+                    if (room != null) roomNumber = room.roomNumber
+                }
+
+                val complaints = SupabaseProvider.db.from("complaints")
+                    .select { filter { eq("student_id", userId) } }
+                    .decodeList<Complaint>()
+                activeComplaint = complaints.firstOrNull { it.status.lowercase() != "resolved" } ?: complaints.firstOrNull()
+
+                val notices = SupabaseProvider.db.from("notices")
+                    .select()
+                    .decodeList<Notice>()
+                latestNotice = notices.firstOrNull()
+
+                val visitors = SupabaseProvider.db.from("visitors")
+                    .select { filter { eq("student_id", userId) } }
+                    .decodeList<Visitor>()
+                latestVisitor = visitors.firstOrNull()
+
+                emergencyContacts = SupabaseProvider.db.from("emergency_contacts")
+                    .select()
+                    .decodeList<EmergencyContact>()
+            } catch (_: Exception) {
+            }
+        }
+    }
+
     Scaffold(
+        modifier = Modifier.fillMaxSize(),
         containerColor = DarkBackground,
         floatingActionButton = {
             FloatingActionButton(
@@ -58,23 +112,17 @@ fun DashboardScreen(navController: NavController) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Profile Avatar
                     Box(
                         modifier = Modifier
                             .size(44.dp)
                             .clip(CircleShape)
-                            .background(DarkCardSurfaceVariant),
+                            .background(DarkCardSurfaceVariant)
+                            .clickable { navController.navigate("profile") },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            Icons.Default.Person,
-                            contentDescription = "Avatar",
-                            tint = TextPrimary,
-                            modifier = Modifier.size(26.dp)
-                        )
+                        Icon(Icons.Default.Person, contentDescription = "Avatar", tint = TextPrimary, modifier = Modifier.size(26.dp))
                     }
 
-                    // Search & Notification Icons
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         IconButton(
                             onClick = { },
@@ -87,7 +135,7 @@ fun DashboardScreen(navController: NavController) {
                         }
                         Box {
                             IconButton(
-                                onClick = { },
+                                onClick = { navController.navigate("notices") },
                                 modifier = Modifier
                                     .size(40.dp)
                                     .clip(CircleShape)
@@ -95,7 +143,6 @@ fun DashboardScreen(navController: NavController) {
                             ) {
                                 Icon(Icons.Default.Notifications, contentDescription = "Notifications", tint = TextPrimary)
                             }
-                            // Red Dot Badge
                             Box(
                                 modifier = Modifier
                                     .size(10.dp)
@@ -130,20 +177,22 @@ fun DashboardScreen(navController: NavController) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     item {
                         StatCard(
-                            title = "A-304",
+                            title = roomNumber,
                             subtitle = "Room",
                             icon = Icons.Default.Domain,
                             iconBg = Color(0xFF1E293B),
-                            iconTint = Color(0xFF38BDF8)
+                            iconTint = Color(0xFF38BDF8),
+                            onClick = { navController.navigate("room") }
                         )
                     }
                     item {
                         StatCard(
-                            title = "₹2,450",
+                            title = messBalance,
                             subtitle = "Mess Balance",
                             icon = Icons.Default.CreditCard,
                             iconBg = Color(0xFF1E293B),
-                            iconTint = Color(0xFF34D399)
+                            iconTint = Color(0xFF34D399),
+                            onClick = { navController.navigate("mess") }
                         )
                     }
                     item {
@@ -152,7 +201,8 @@ fun DashboardScreen(navController: NavController) {
                             subtitle = "Attendance",
                             icon = Icons.Default.Timeline,
                             iconBg = Color(0xFF1E293B),
-                            iconTint = AccentAmber
+                            iconTint = AccentAmber,
+                            onClick = { }
                         )
                     }
                 }
@@ -170,8 +220,8 @@ fun DashboardScreen(navController: NavController) {
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        QuickActionButton("Room", Icons.Default.Domain, Color(0xFF1E293B), Color(0xFF38BDF8)) { }
-                        QuickActionButton("Mess Menu", Icons.Default.FreeBreakfast, Color(0xFF1E293B), AccentAmber) { }
+                        QuickActionButton("Room", Icons.Default.Domain, Color(0xFF1E293B), Color(0xFF38BDF8)) { navController.navigate("room") }
+                        QuickActionButton("Mess Menu", Icons.Default.FreeBreakfast, Color(0xFF1E293B), AccentAmber) { navController.navigate("mess") }
                         QuickActionButton("Complaints", Icons.Default.Warning, Color(0xFF1E293B), AccentRed) { navController.navigate("complaints") }
                         QuickActionButton("Notices", Icons.Default.Assignment, Color(0xFF1E293B), AccentTeal) { navController.navigate("notices") }
                     }
@@ -180,17 +230,22 @@ fun DashboardScreen(navController: NavController) {
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         QuickActionButton("Events", Icons.Default.DateRange, Color(0xFF1E293B), AccentPurple) { navController.navigate("events") }
-                        QuickActionButton("Laundry", Icons.Default.Checkroom, Color(0xFF1E293B), Color(0xFF06B6D4)) { }
-                        QuickActionButton("Parcels", Icons.Default.Inventory2, Color(0xFF1E293B), Color(0xFF6366F1)) { }
-                        QuickActionButton("More", Icons.Default.MoreHoriz, Color(0xFF1E293B), TextMuted) { }
+                        QuickActionButton("Laundry", Icons.Default.Checkroom, Color(0xFF1E293B), Color(0xFF06B6D4)) { navController.navigate("laundry") }
+                        QuickActionButton("Parcels", Icons.Default.Inventory2, Color(0xFF1E293B), Color(0xFF6366F1)) { navController.navigate("parcels") }
+                        QuickActionButton("Visitors", Icons.Default.Group, Color(0xFF1E293B), Color(0xFF10B981)) { navController.navigate("visitors") }
                     }
                 }
             }
 
             // 5. ACTIVE COMPLAINT STEPPER CARD
             item {
+                val complaintTitle = activeComplaint?.title ?: "AC Not Cooling (Ref #204)"
+                val complaintStatus = activeComplaint?.status ?: "In Progress"
+
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { navController.navigate("complaints") },
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = DarkCardSurface)
                 ) {
@@ -207,7 +262,7 @@ fun DashboardScreen(navController: NavController) {
                                     color = TextPrimary
                                 )
                                 Text(
-                                    text = "AC Not Cooling (Ref #204)",
+                                    text = complaintTitle,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = TextMuted
                                 )
@@ -217,7 +272,7 @@ fun DashboardScreen(navController: NavController) {
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text(
-                                    text = "IN PROGRESS",
+                                    text = complaintStatus.uppercase(),
                                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                     color = AccentAmber,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
@@ -227,16 +282,16 @@ fun DashboardScreen(navController: NavController) {
 
                         Spacer(modifier = Modifier.height(20.dp))
 
-                        // Stepper Line
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            val statusLower = complaintStatus.lowercase()
                             StepItem("SUBMITTED", isCompleted = true, isActive = false)
-                            StepItem("ASSIGNED", isCompleted = true, isActive = false)
-                            StepItem("IN PROGRESS", isCompleted = false, isActive = true)
-                            StepItem("RESOLVED", isCompleted = false, isActive = false)
+                            StepItem("ASSIGNED", isCompleted = statusLower in listOf("assigned", "in progress", "resolved"), isActive = false)
+                            StepItem("IN PROGRESS", isCompleted = statusLower == "resolved", isActive = statusLower == "in progress")
+                            StepItem("RESOLVED", isCompleted = false, isActive = statusLower == "resolved")
                         }
                     }
                 }
@@ -259,12 +314,14 @@ fun DashboardScreen(navController: NavController) {
                             text = "Full Menu >",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextCyan,
-                            modifier = Modifier.clickable { }
+                            modifier = Modifier.clickable { navController.navigate("mess") }
                         )
                     }
 
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { navController.navigate("mess") },
                         shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(containerColor = DarkCardSurface)
                     ) {
@@ -283,8 +340,13 @@ fun DashboardScreen(navController: NavController) {
 
             // 7. VISITOR REQUEST CARD
             item {
+                val visitorName = latestVisitor?.visitorName ?: "John Doe"
+                val visitorStatus = latestVisitor?.status ?: "Approved"
+
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { navController.navigate("visitors") },
                     shape = RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors(containerColor = DarkCardSurface)
                 ) {
@@ -308,7 +370,7 @@ fun DashboardScreen(navController: NavController) {
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text("Visitor Request", style = MaterialTheme.typography.titleSmall, color = TextPrimary)
-                                Text("John Doe • Approved", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                                Text("$visitorName • $visitorStatus", style = MaterialTheme.typography.bodySmall, color = TextMuted)
                             }
                         }
                         Surface(
@@ -347,9 +409,9 @@ fun DashboardScreen(navController: NavController) {
                         )
                     }
 
-                    NoticeItemCard("HIGH", AccentRed, "Water Supply Maintenance", "2h ago")
-                    NoticeItemCard("MEDIUM", AccentAmber, "Room Inspection Schedule", "1d ago")
-                    NoticeItemCard("LOW", AccentBlueLight, "Hostel Fee Deadline", "2d ago")
+                    NoticeItemCard("HIGH", AccentRed, latestNotice?.title ?: "Water Supply Maintenance", "2h ago") { navController.navigate("notices") }
+                    NoticeItemCard("MEDIUM", AccentAmber, "Room Inspection Schedule", "1d ago") { navController.navigate("notices") }
+                    NoticeItemCard("LOW", AccentBlueLight, "Hostel Fee Deadline", "2d ago") { navController.navigate("notices") }
                 }
             }
 
@@ -424,30 +486,43 @@ fun DashboardScreen(navController: NavController) {
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        EmergencyCard("Warden", "North Block", Icons.Default.Phone, modifier = Modifier.weight(1f))
-                        EmergencyCard("Medical", "Health Center", Icons.Default.Add, modifier = Modifier.weight(1f))
+                        EmergencyCard("Warden", "North Block", "+91-9000000001", Icons.Default.Phone, modifier = Modifier.weight(1f)) {
+                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:+919000000001"))
+                            context.startActivity(intent)
+                        }
+                        EmergencyCard("Medical", "Health Center", "+91-9000000002", Icons.Default.Add, modifier = Modifier.weight(1f)) {
+                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:+919000000002"))
+                            context.startActivity(intent)
+                        }
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        EmergencyCard("Security", "Main Gate", Icons.Default.Warning, modifier = Modifier.weight(1f))
-                        EmergencyCard("Office", "Helpdesk", Icons.Default.Business, modifier = Modifier.weight(1f))
+                        EmergencyCard("Security", "Main Gate", "+91-9000000003", Icons.Default.Warning, modifier = Modifier.weight(1f)) {
+                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:+919000000003"))
+                            context.startActivity(intent)
+                        }
+                        EmergencyCard("Office", "Helpdesk", "+91-9000000004", Icons.Default.Business, modifier = Modifier.weight(1f)) {
+                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:+919000000004"))
+                            context.startActivity(intent)
+                        }
                     }
                 }
             }
 
-            item { Spacer(modifier = Modifier.height(30.dp)) }
+            item { Spacer(modifier = Modifier.height(40.dp)) }
         }
     }
 }
 
 @Composable
-fun StatCard(title: String, subtitle: String, icon: ImageVector, iconBg: Color, iconTint: Color) {
+fun StatCard(title: String, subtitle: String, icon: ImageVector, iconBg: Color, iconTint: Color, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .width(130.dp)
-            .height(110.dp),
+            .height(110.dp)
+            .clickable { onClick() },
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = DarkCardSurface)
     ) {
@@ -559,9 +634,11 @@ fun MessMealItem(title: String, menu: String, time: String, calories: String, is
 }
 
 @Composable
-fun NoticeItemCard(priority: String, badgeColor: Color, title: String, time: String) {
+fun NoticeItemCard(priority: String, badgeColor: Color, title: String, time: String, onClick: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = DarkCardSurface)
     ) {
@@ -592,9 +669,11 @@ fun NoticeItemCard(priority: String, badgeColor: Color, title: String, time: Str
 }
 
 @Composable
-fun EmergencyCard(title: String, subtitle: String, icon: ImageVector, modifier: Modifier = Modifier) {
+fun EmergencyCard(title: String, subtitle: String, phone: String, icon: ImageVector, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Card(
-        modifier = modifier.height(100.dp),
+        modifier = modifier
+            .height(100.dp)
+            .clickable { onClick() },
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = EmergencyCardBg)
     ) {

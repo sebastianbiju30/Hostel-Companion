@@ -45,6 +45,21 @@ fun HostelNavGraph() {
             composable("events") {
                 EventsScreen()
             }
+            composable("room") {
+                RoomScreen()
+            }
+            composable("mess") {
+                MessMenuScreen()
+            }
+            composable("laundry") {
+                LaundryScreen()
+            }
+            composable("parcels") {
+                ParcelsScreen()
+            }
+            composable("visitors") {
+                VisitorsScreen()
+            }
             composable("profile") {
                 ProfileScreen(
                     onSignOut = {
