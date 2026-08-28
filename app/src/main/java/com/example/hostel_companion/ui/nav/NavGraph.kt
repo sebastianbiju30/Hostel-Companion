@@ -42,6 +42,9 @@ fun HostelNavGraph() {
             composable("notices") {
                 NoticesScreen()
             }
+            composable("events") {
+                EventsScreen()
+            }
             composable("profile") {
                 ProfileScreen(
                     onSignOut = {
