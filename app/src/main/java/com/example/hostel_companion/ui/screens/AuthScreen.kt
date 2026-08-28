@@ -18,6 +18,7 @@ fun AuthScreen(onLoginSuccess: () -> Unit) {
     var isSignUp by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var infoMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     Surface(
@@ -47,7 +48,7 @@ fun AuthScreen(onLoginSuccess: () -> Unit) {
 
             OutlinedTextField(
                 value = email,
-                onValueChange = { email = it },
+                onValueChange = { email = it; errorMessage = null; infoMessage = null },
                 label = { Text("Email Address") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
@@ -57,12 +58,21 @@ fun AuthScreen(onLoginSuccess: () -> Unit) {
 
             OutlinedTextField(
                 value = password,
-                onValueChange = { password = it },
+                onValueChange = { password = it; errorMessage = null; infoMessage = null },
                 label = { Text("Password") },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth()
             )
+
+            infoMessage?.let { msg ->
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = msg,
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
 
             errorMessage?.let { msg ->
                 Spacer(modifier = Modifier.height(12.dp))
@@ -84,21 +94,34 @@ fun AuthScreen(onLoginSuccess: () -> Unit) {
                     scope.launch {
                         isLoading = true
                         errorMessage = null
+                        infoMessage = null
                         try {
                             if (isSignUp) {
                                 SupabaseProvider.auth.signUpWith(Email) {
-                                    this.email = email
+                                    this.email = email.trim()
                                     this.password = password
+                                }
+                                val session = SupabaseProvider.auth.currentSessionOrNull()
+                                if (session != null) {
+                                    onLoginSuccess()
+                                } else {
+                                    infoMessage = "Account created successfully! If email confirmation is enabled in your Supabase project, please check your inbox to confirm your email before signing in."
+                                    isSignUp = false
                                 }
                             } else {
                                 SupabaseProvider.auth.signInWith(Email) {
-                                    this.email = email
+                                    this.email = email.trim()
                                     this.password = password
                                 }
+                                onLoginSuccess()
                             }
-                            onLoginSuccess()
                         } catch (e: Exception) {
-                            errorMessage = e.localizedMessage ?: "Authentication failed"
+                            val msg = e.localizedMessage ?: "Authentication failed"
+                            errorMessage = if (msg.contains("email_not_confirmed", ignoreCase = true)) {
+                                "Email not confirmed. Please check your inbox or manually confirm the user in Supabase Authentication -> Users."
+                            } else {
+                                msg
+                            }
                         } finally {
                             isLoading = false
                         }
@@ -121,7 +144,7 @@ fun AuthScreen(onLoginSuccess: () -> Unit) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            TextButton(onClick = { isSignUp = !isSignUp }) {
+            TextButton(onClick = { isSignUp = !isSignUp; errorMessage = null; infoMessage = null }) {
                 Text(if (isSignUp) "Already have an account? Sign In" else "Don't have an account? Sign Up")
             }
         }
