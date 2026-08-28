@@ -32,20 +32,20 @@ fun NoticesScreen() {
                     Notice(
                         id = "1",
                         title = "Water Supply Maintenance",
-                        content = "Water supply will be suspended on Saturday from 10:00 AM to 2:00 PM for tank cleaning.",
-                        category = "Maintenance"
+                        body = "Water supply will be suspended on Saturday from 10:00 AM to 2:00 PM for tank cleaning.",
+                        priority = "High"
                     ),
                     Notice(
                         id = "2",
                         title = "Hostel Annual Cultural Night",
-                        content = "Join us for the annual hostel night in the main auditorium this Friday at 6:00 PM!",
-                        category = "Event"
+                        body = "Join us for the annual hostel night in the main auditorium this Friday at 6:00 PM!",
+                        priority = "Medium"
                     ),
                     Notice(
                         id = "3",
                         title = "Quiet Hours Enforcement",
-                        content = "Strict quiet hours are in effect from 10:00 PM to 6:00 AM daily due to upcoming mid-terms.",
-                        category = "Rules"
+                        body = "Strict quiet hours are in effect from 10:00 PM to 6:00 AM daily due to upcoming mid-terms.",
+                        priority = "Low"
                     )
                 )
             } finally {
@@ -83,20 +83,23 @@ fun NoticesScreen() {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(notice.title, style = MaterialTheme.typography.titleMedium)
                                     AssistChip(
                                         onClick = { },
-                                        label = { Text(notice.category) }
+                                        label = { Text("${notice.priority} Priority") }
                                     )
                                 }
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    notice.content,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                notice.body?.let { bodyText ->
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        bodyText,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }

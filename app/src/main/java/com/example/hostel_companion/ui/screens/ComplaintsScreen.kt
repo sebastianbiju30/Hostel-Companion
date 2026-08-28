@@ -31,23 +31,21 @@ fun ComplaintsScreen() {
                     .select()
                     .decodeList<Complaint>()
             } catch (e: Exception) {
-                // Fallback sample data if DB is not yet populated
+                // Fallback sample data if DB connection is offline
                 complaints = listOf(
                     Complaint(
                         id = "1",
                         title = "Fan not working",
                         description = "Ceiling fan making strange noise and stopped moving.",
                         category = "Electrical",
-                        status = "Pending",
-                        roomNumber = "304B"
+                        status = "Submitted"
                     ),
                     Complaint(
                         id = "2",
                         title = "Water tap leakage",
                         description = "Bathroom sink tap dripping continuously.",
                         category = "Plumbing",
-                        status = "In Progress",
-                        roomNumber = "304B"
+                        status = "In Progress"
                     )
                 )
             } finally {
@@ -104,7 +102,7 @@ fun ComplaintsScreen() {
             if (showDialog) {
                 AddComplaintDialog(
                     onDismiss = { showDialog = false },
-                    onSubmit = { title, desc, cat, room ->
+                    onSubmit = { title, desc, cat ->
                         showDialog = false
                         scope.launch {
                             try {
@@ -113,18 +111,15 @@ fun ComplaintsScreen() {
                                     title = title,
                                     description = desc,
                                     category = cat,
-                                    roomNumber = room,
-                                    userId = userId
+                                    studentId = userId
                                 )
                                 SupabaseProvider.db.from("complaints").insert(newComplaint)
                                 fetchComplaints()
                             } catch (e: Exception) {
-                                // Add to local list on network error
                                 complaints = complaints + Complaint(
                                     title = title,
                                     description = desc,
-                                    category = cat,
-                                    roomNumber = room
+                                    category = cat
                                 )
                             }
                         }
@@ -151,12 +146,14 @@ fun ComplaintCard(complaint: Complaint) {
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                "Category: ${complaint.category} • Room: ${complaint.roomNumber}",
+                "Category: ${complaint.category}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(complaint.description, style = MaterialTheme.typography.bodyMedium)
+            complaint.description?.let { desc ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(desc, style = MaterialTheme.typography.bodyMedium)
+            }
         }
     }
 }
@@ -165,7 +162,7 @@ fun ComplaintCard(complaint: Complaint) {
 fun StatusBadge(status: String) {
     val containerColor = when (status.lowercase()) {
         "resolved" -> MaterialTheme.colorScheme.primaryContainer
-        "in progress" -> MaterialTheme.colorScheme.tertiaryContainer
+        "in progress", "assigned" -> MaterialTheme.colorScheme.tertiaryContainer
         else -> MaterialTheme.colorScheme.errorContainer
     }
     Surface(
@@ -183,12 +180,11 @@ fun StatusBadge(status: String) {
 @Composable
 fun AddComplaintDialog(
     onDismiss: () -> Unit,
-    onSubmit: (title: String, desc: String, category: String, room: String) -> Unit
+    onSubmit: (title: String, desc: String, category: String) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var desc by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf("Maintenance") }
-    var room by remember { mutableStateOf("304B") }
+    var category by remember { mutableStateOf("Electrical") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -210,13 +206,7 @@ fun AddComplaintDialog(
                 OutlinedTextField(
                     value = category,
                     onValueChange = { category = it },
-                    label = { Text("Category (Electrical, Plumbing, etc.)") },
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = room,
-                    onValueChange = { room = it },
-                    label = { Text("Room Number") },
+                    label = { Text("Category (Electrical, Plumbing, AC, etc.)") },
                     singleLine = true
                 )
             }
@@ -224,8 +214,8 @@ fun AddComplaintDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (title.isNotBlank() && desc.isNotBlank()) {
-                        onSubmit(title, desc, category, room)
+                    if (title.isNotBlank()) {
+                        onSubmit(title, desc, category)
                     }
                 }
             ) {
