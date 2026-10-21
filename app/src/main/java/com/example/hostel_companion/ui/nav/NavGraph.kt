@@ -26,12 +26,25 @@ fun HostelNavGraph() {
         ) {
             composable("auth") {
                 AuthScreen(
-                    onLoginSuccess = {
-                        navController.navigate("dashboard") {
+                    onLoginSuccess = { isNewUser ->
+                        val target = if (isNewUser) "onboarding" else "dashboard"
+                        navController.navigate(target) {
                             popUpTo("auth") { inclusive = true }
                         }
                     }
                 )
+            }
+            composable("onboarding") {
+                OnboardingScreen(
+                    onOnboardingComplete = {
+                        navController.navigate("dashboard") {
+                            popUpTo("onboarding") { inclusive = true }
+                        }
+                    }
+                )
+            }
+            composable("admin_dashboard") {
+                AdminDashboardScreen(navController = navController)
             }
             composable("dashboard") {
                 DashboardScreen(navController = navController)
@@ -60,8 +73,10 @@ fun HostelNavGraph() {
             composable("visitors") {
                 VisitorsScreen()
             }
+            composable("chatbot") { ChatBotScreen(navController = navController) }
             composable("profile") {
                 ProfileScreen(
+                    navController = navController,
                     onSignOut = {
                         navController.navigate("auth") {
                             popUpTo(0) { inclusive = true }

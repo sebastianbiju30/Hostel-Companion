@@ -1,7 +1,7 @@
 package com.example.hostel_companion.ui.components
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Assignment
+import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
@@ -18,7 +18,7 @@ import com.example.hostel_companion.ui.theme.TextPrimary
 
 sealed class BottomNavItem(val route: String, val title: String, val icon: ImageVector) {
     object Home : BottomNavItem("dashboard", "Home", Icons.Default.Home)
-    object Notices : BottomNavItem("notices", "Notices", Icons.Default.Assignment)
+    object Notices : BottomNavItem("notices", "Notices", Icons.AutoMirrored.Filled.Assignment)
     object Complaints : BottomNavItem("complaints", "Complaints", Icons.Default.Warning)
     object Events : BottomNavItem("events", "Events", Icons.Default.DateRange)
     object Profile : BottomNavItem("profile", "Profile", Icons.Default.Person)

@@ -12,7 +12,8 @@ data class UserProfile(
     val role: String = "student",
     @SerialName("room_id") val roomId: String? = null,
     @SerialName("avatar_url") val avatarUrl: String? = null,
-    @SerialName("created_at") val createdAt: String? = null
+    @SerialName("created_at") val createdAt: String? = null,
+    val isAdmin: Boolean = false
 )
 
 @Serializable
@@ -33,6 +34,7 @@ data class Complaint(
     val category: String = "Other",
     val status: String = "Submitted",
     @SerialName("assigned_to") val assignedTo: String? = null,
+    @SerialName("photo_url") val photoUrl: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("resolved_at") val resolvedAt: String? = null
 )

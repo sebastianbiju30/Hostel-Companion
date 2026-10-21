@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,6 +42,7 @@ fun DashboardScreen(navController: NavController) {
     var latestNotice by remember { mutableStateOf<Notice?>(null) }
     var latestVisitor by remember { mutableStateOf<Visitor?>(null) }
     var emergencyContacts by remember { mutableStateOf<List<EmergencyContact>>(emptyList()) }
+    var isUserAdmin by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
 
@@ -51,6 +53,9 @@ fun DashboardScreen(navController: NavController) {
                 val profile = SupabaseProvider.db.from("profiles")
                     .select { filter { eq("id", userId) } }
                     .decodeSingleOrNull<UserProfile>()
+                if (profile?.isAdmin == true) {
+                    isUserAdmin = true
+                }
                 if (profile?.roomId != null) {
                     val room = SupabaseProvider.db.from("rooms")
                         .select { filter { eq("id", profile.roomId) } }
@@ -125,6 +130,15 @@ fun DashboardScreen(navController: NavController) {
 
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         IconButton(
+                            onClick = { navController.navigate("chatbot") },
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(DarkCardSurface)
+                        ) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = "AI Assistant", tint = AccentTeal)
+                        }
+                        IconButton(
                             onClick = { },
                             modifier = Modifier
                                 .size(40.dp)
@@ -169,6 +183,119 @@ fun DashboardScreen(navController: NavController) {
                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                         color = TextPrimary
                     )
+                }
+            }
+
+            // 2b. WARDEN CONTROL PANEL BANNER
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { navController.navigate("admin_dashboard") },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (isUserAdmin) "👑 Warden Control Center" else "🛡️ Open Warden / Admin Mode",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Text(
+                                text = "Resolve complaints, post notices, mess menu & events.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.SupervisorAccount,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+            }
+
+            // 2c. AI CAMPUS ASSISTANT BANNER
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { navController.navigate("chatbot") },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = DarkCardSurface),
+                    border = CardDefaults.outlinedCardBorder().copy(
+                        brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                            listOf(AccentBlueLight, AccentPurple)
+                        )
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(46.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    androidx.compose.ui.graphics.Brush.linearGradient(
+                                        listOf(AccentBlueLight, AccentPurple)
+                                    )
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Ask Campus AI Assistant",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = TextPrimary
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    color = AccentTeal.copy(alpha = 0.2f),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(
+                                        text = "AI",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = AccentTeal,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Instant answers for mess menu, complaints, laundry, rules & contacts.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextMuted
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = TextMuted
+                        )
+                    }
                 }
             }
 
@@ -223,7 +350,7 @@ fun DashboardScreen(navController: NavController) {
                         QuickActionButton("Room", Icons.Default.Domain, Color(0xFF1E293B), Color(0xFF38BDF8)) { navController.navigate("room") }
                         QuickActionButton("Mess Menu", Icons.Default.FreeBreakfast, Color(0xFF1E293B), AccentAmber) { navController.navigate("mess") }
                         QuickActionButton("Complaints", Icons.Default.Warning, Color(0xFF1E293B), AccentRed) { navController.navigate("complaints") }
-                        QuickActionButton("Notices", Icons.Default.Assignment, Color(0xFF1E293B), AccentTeal) { navController.navigate("notices") }
+                        QuickActionButton("Notices", Icons.AutoMirrored.Filled.Assignment, Color(0xFF1E293B), AccentTeal) { navController.navigate("notices") }
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),

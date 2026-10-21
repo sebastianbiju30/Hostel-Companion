@@ -19,6 +19,8 @@ fun NoticesScreen() {
     var notices by remember { mutableStateOf<List<Notice>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredNotices = if (searchQuery.isBlank()) notices else notices.filter { it.title.contains(searchQuery, ignoreCase = true) || (it.body?.contains(searchQuery, ignoreCase = true) ?: false) }
 
     LaunchedEffect(Unit) {
         scope.launch {
@@ -72,33 +74,42 @@ fun NoticesScreen() {
             if (isLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(notices) { notice ->
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(notice.title, style = MaterialTheme.typography.titleMedium)
-                                    AssistChip(
-                                        onClick = { },
-                                        label = { Text("${notice.priority} Priority") }
-                                    )
-                                }
-                                notice.body?.let { bodyText ->
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        bodyText,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                Column(modifier = Modifier.padding(16.dp)) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        label = { Text("Search notices") },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp)
+                    )
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(filteredNotices) { notice ->
+                            Card(modifier = Modifier.fillMaxWidth()) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(notice.title, style = MaterialTheme.typography.titleMedium)
+                                        AssistChip(
+                                            onClick = { },
+                                            label = { Text("${notice.priority} Priority") }
+                                        )
+                                    }
+                                    notice.body?.let { bodyText ->
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            bodyText,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
                             }
                         }

@@ -1,18 +1,24 @@
 package com.example.hostel_companion.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.hostel_companion.data.SupabaseProvider
+import com.example.hostel_companion.data.parseSupabaseErrorMessage
 import io.github.jan.supabase.auth.providers.builtin.Email
 import kotlinx.coroutines.launch
 
 @Composable
-fun AuthScreen(onLoginSuccess: () -> Unit) {
+fun AuthScreen(onLoginSuccess: (isNewUser: Boolean) -> Unit) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isSignUp by remember { mutableStateOf(false) }
@@ -28,20 +34,23 @@ fun AuthScreen(onLoginSuccess: () -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             Text(
                 text = if (isSignUp) "Create Account" else "Hostel Companion Login",
                 style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "Welcome! Sign in to manage your room & complaints",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
             )
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -51,6 +60,10 @@ fun AuthScreen(onLoginSuccess: () -> Unit) {
                 onValueChange = { email = it; errorMessage = null; infoMessage = null },
                 label = { Text("Email Address") },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Email,
+                    autoCorrectEnabled = false
+                ),
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -59,36 +72,67 @@ fun AuthScreen(onLoginSuccess: () -> Unit) {
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it; errorMessage = null; infoMessage = null },
-                label = { Text("Password") },
+                label = { Text("Password (min 6 characters)") },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password
+                ),
                 modifier = Modifier.fillMaxWidth()
             )
 
             infoMessage?.let { msg ->
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = msg,
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = msg,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(12.dp),
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
 
             errorMessage?.let { msg ->
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = msg,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall
-                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = msg,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(12.dp),
+                        textAlign = TextAlign.Start
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
                 onClick = {
-                    if (email.isBlank() || password.isBlank()) {
+                    val trimmedEmail = email.trim()
+                    val trimmedPassword = password.trim()
+                    if (trimmedEmail.isBlank() || trimmedPassword.isBlank()) {
                         errorMessage = "Please enter both email and password"
+                        return@Button
+                    }
+                    if (!android.util.Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()) {
+                        errorMessage = "Please enter a valid email address"
+                        return@Button
+                    }
+                    if (trimmedPassword.length < 6) {
+                        errorMessage = "Password must be at least 6 characters long"
                         return@Button
                     }
                     scope.launch {
@@ -97,31 +141,48 @@ fun AuthScreen(onLoginSuccess: () -> Unit) {
                         infoMessage = null
                         try {
                             if (isSignUp) {
-                                SupabaseProvider.auth.signUpWith(Email) {
-                                    this.email = email.trim()
-                                    this.password = password
+                                try {
+                                    SupabaseProvider.auth.signUpWith(Email) {
+                                        this.email = trimmedEmail
+                                        this.password = trimmedPassword
+                                    }
+                                } catch (e: Exception) {
+                                    val errStr = e.message?.lowercase() ?: ""
+                                    if (errStr.contains("already registered") || errStr.contains("user_already_exists")) {
+                                        // Attempt sign-in if account exists
+                                        SupabaseProvider.auth.signInWith(Email) {
+                                            this.email = trimmedEmail
+                                            this.password = trimmedPassword
+                                        }
+                                    } else {
+                                        throw e
+                                    }
                                 }
-                                val session = SupabaseProvider.auth.currentSessionOrNull()
-                                if (session != null) {
-                                    onLoginSuccess()
-                                } else {
-                                    infoMessage = "Account created successfully! If email confirmation is enabled in your Supabase project, please check your inbox to confirm your email before signing in."
-                                    isSignUp = false
+
+                                // Perform sign in to establish active session and open Onboarding window
+                                try {
+                                    SupabaseProvider.auth.signInWith(Email) {
+                                        this.email = trimmedEmail
+                                        this.password = trimmedPassword
+                                    }
+                                    onLoginSuccess(true)
+                                } catch (_: Exception) {
+                                    if (SupabaseProvider.auth.currentSessionOrNull() != null) {
+                                        onLoginSuccess(true)
+                                    } else {
+                                        infoMessage = "Account created! Please sign in with your credentials."
+                                        isSignUp = false
+                                    }
                                 }
                             } else {
                                 SupabaseProvider.auth.signInWith(Email) {
-                                    this.email = email.trim()
-                                    this.password = password
+                                    this.email = trimmedEmail
+                                    this.password = trimmedPassword
                                 }
-                                onLoginSuccess()
+                                onLoginSuccess(false)
                             }
                         } catch (e: Exception) {
-                            val msg = e.localizedMessage ?: "Authentication failed"
-                            errorMessage = if (msg.contains("email_not_confirmed", ignoreCase = true)) {
-                                "Email not confirmed. Please check your inbox or manually confirm the user in Supabase Authentication -> Users."
-                            } else {
-                                msg
-                            }
+                            errorMessage = parseSupabaseErrorMessage(e)
                         } finally {
                             isLoading = false
                         }
@@ -142,6 +203,46 @@ fun AuthScreen(onLoginSuccess: () -> Unit) {
                 }
             }
 
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = {
+                    scope.launch {
+                        isLoading = true
+                        errorMessage = null
+                        infoMessage = null
+                        try {
+                            try {
+                                SupabaseProvider.auth.signInWith(Email) {
+                                    this.email = "testuser99@gmail.com"
+                                    this.password = "Password123!"
+                                }
+                            } catch (_: Exception) {
+                                SupabaseProvider.auth.signUpWith(Email) {
+                                    this.email = "testuser99@gmail.com"
+                                    this.password = "Password123!"
+                                }
+                                SupabaseProvider.auth.signInWith(Email) {
+                                    this.email = "testuser99@gmail.com"
+                                    this.password = "Password123!"
+                                }
+                            }
+                            onLoginSuccess(false)
+                        } catch (e: Exception) {
+                            errorMessage = parseSupabaseErrorMessage(e)
+                        } finally {
+                            isLoading = false
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                enabled = !isLoading
+            ) {
+                Text("⚡ Quick Demo Sign-In")
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
             TextButton(onClick = { isSignUp = !isSignUp; errorMessage = null; infoMessage = null }) {
@@ -150,3 +251,5 @@ fun AuthScreen(onLoginSuccess: () -> Unit) {
         }
     }
 }
+
+

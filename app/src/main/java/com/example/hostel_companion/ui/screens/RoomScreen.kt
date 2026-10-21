@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Domain
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,6 +25,11 @@ fun RoomScreen() {
     var roomInfo by remember { mutableStateOf<Room?>(null) }
     var roommates by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredRoommates = if (searchQuery.isBlank()) roommates else roommates.filter {
+        (it.fullName?.contains(searchQuery, ignoreCase = true) ?: false) ||
+        (it.email?.contains(searchQuery, ignoreCase = true) ?: false)
+    }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
@@ -98,14 +105,34 @@ fun RoomScreen() {
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text("Capacity: ${roomInfo?.capacity} Beds", color = TextMuted)
-                                Text("Occupied: ${roommates.size} Beds", color = AccentTeal)
+                                Text("Occupied: ${filteredRoommates.size} Beds", color = AccentTeal)
                             }
                         }
                     }
 
                     Text("Roommates", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
 
-                    roommates.forEach { roommate ->
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    label = { Text("Search roommates") },
+                    singleLine = true,
+                    leadingIcon = {
+                        Icon(imageVector = Icons.Default.Search, contentDescription = "Search Icon")
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(imageVector = Icons.Default.Clear, contentDescription = "Clear Search")
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                )
+
+                    filteredRoommates.forEach { roommate ->
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),

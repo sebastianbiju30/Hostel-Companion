@@ -87,6 +87,7 @@ create table if not exists complaints (
   category text check (category in ('Electrical','Plumbing','AC','Furniture','Internet','Cleanliness','Other')) default 'Other',
   status text not null default 'Submitted' check (status in ('Submitted','Assigned','In Progress','Resolved')),
   assigned_to uuid references profiles(id),  -- staff/admin handling it
+  photo_url text,
   created_at timestamptz default now(),
   resolved_at timestamptz
 );

@@ -19,3 +19,7 @@ val EmergencyIconBg = Color(0xFF4A1B2D)
 val TextPrimary = Color(0xFFFFFFFF)
 val TextMuted = Color(0xFF8A99AD)
 val TextCyan = Color(0xFF60A5FA)
+
+val StatusGreen = Color(0xFF10B981)
+val StatusYellow = Color(0xFFF59E0B)
+val StatusRed = Color(0xFFEF4444)
