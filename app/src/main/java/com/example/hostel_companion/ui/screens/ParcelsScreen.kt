@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.hostel_companion.data.SupabaseProvider
 import com.example.hostel_companion.data.models.Parcel
+import com.example.hostel_companion.data.repository.HostelRepository
 import com.example.hostel_companion.ui.theme.*
 import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.launch
@@ -25,28 +26,12 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ParcelsScreen() {
-    var parcels by remember { mutableStateOf<List<Parcel>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    val scope = rememberCoroutineScope()
+    val parcels by HostelRepository.parcels.collectAsState()
+    var isLoading by remember { mutableStateOf(false) }
 
-    fun fetchParcels() {
-        scope.launch {
-            isLoading = true
-            try {
-                parcels = SupabaseProvider.db.from("parcels").select().decodeList<Parcel>()
-            } catch (_: Exception) {
-                parcels = listOf(
-                    Parcel(id = "pr101", sender = "Amazon Delivery", description = "MacBook Charger & Electronics", status = "Ready for Pickup", arrivedAt = "Today, 11:30 AM"),
-                    Parcel(id = "pr102", sender = "Flipkart Package", description = "Engineering Textbooks & Notes", status = "Arrived", arrivedAt = "Yesterday, 04:00 PM"),
-                    Parcel(id = "pr103", sender = "BlueDart Express", description = "Home Documents & Sweets", status = "Collected", arrivedAt = "Oct 19, 02:15 PM")
-                )
-            } finally {
-                isLoading = false
-            }
-        }
+    LaunchedEffect(Unit) {
+        HostelRepository.refreshFromSupabase()
     }
-
-    LaunchedEffect(Unit) { fetchParcels() }
 
     Scaffold(
         containerColor = DarkBackground,
@@ -60,7 +45,7 @@ fun ParcelsScreen() {
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkCardSurface),
                 actions = {
-                    IconButton(onClick = { fetchParcels() }) {
+                    IconButton(onClick = { HostelRepository.refreshFromSupabase() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = TextPrimary)
                     }
                 }

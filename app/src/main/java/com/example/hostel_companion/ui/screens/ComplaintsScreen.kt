@@ -36,6 +36,7 @@ import coil.compose.AsyncImage
 import com.example.hostel_companion.data.SupabaseProvider
 import com.example.hostel_companion.data.models.Complaint
 import com.example.hostel_companion.data.models.UserProfile
+import com.example.hostel_companion.data.repository.HostelRepository
 import com.example.hostel_companion.ui.theme.*
 import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.Dispatchers
@@ -50,8 +51,8 @@ import java.util.*
 @Composable
 fun ComplaintsScreen() {
     val context = LocalContext.current
-    var complaints by remember { mutableStateOf<List<Complaint>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
+    val complaints by HostelRepository.complaints.collectAsState()
+    var isLoading by remember { mutableStateOf(false) }
     var showDialog by remember { mutableStateOf(false) }
     var isUserAdmin by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -61,55 +62,21 @@ fun ComplaintsScreen() {
 
     val categories = listOf("All", "Electrical", "Plumbing", "AC", "Furniture", "Cleanliness", "Internet", "Other")
 
-    fun fetchComplaints() {
+    fun checkUserRole() {
         scope.launch {
-            isLoading = true
             try {
                 val userId = SupabaseProvider.auth.currentUserOrNull()?.id ?: ""
                 val profile = SupabaseProvider.db.from("profiles")
                     .select { filter { eq("id", userId) } }
                     .decodeSingleOrNull<UserProfile>()
                 isUserAdmin = profile?.role?.lowercase() in listOf("admin", "warden") || profile?.isAdmin == true
-
-                complaints = SupabaseProvider.db.from("complaints")
-                    .select()
-                    .decodeList<Complaint>()
-            } catch (_: Exception) {
-                // Fallback realistic complaints
-                complaints = listOf(
-                    Complaint(
-                        id = "1",
-                        title = "AC Not Cooling (Room A-304)",
-                        description = "AC blowing warm air continuously. Fan speed seems low.",
-                        category = "AC",
-                        status = "In Progress",
-                        createdAt = "2026-10-20T10:30:00Z"
-                    ),
-                    Complaint(
-                        id = "2",
-                        title = "Water tap leakage in washroom",
-                        description = "Bathroom sink tap dripping and making splashing noise all night.",
-                        category = "Plumbing",
-                        status = "Assigned",
-                        createdAt = "2026-10-19T14:15:00Z"
-                    ),
-                    Complaint(
-                        id = "3",
-                        title = "Ceiling fan making clicking sound",
-                        description = "Rotor clicking loudly on speed 3 and 4.",
-                        category = "Electrical",
-                        status = "Resolved",
-                        createdAt = "2026-10-18T09:00:00Z"
-                    )
-                )
-            } finally {
-                isLoading = false
-            }
+            } catch (_: Exception) {}
         }
     }
 
     LaunchedEffect(Unit) {
-        fetchComplaints()
+        checkUserRole()
+        HostelRepository.refreshFromSupabase()
     }
 
     val filteredComplaints = complaints.filter { complaint ->
@@ -147,7 +114,7 @@ fun ComplaintsScreen() {
                     containerColor = DarkCardSurface
                 ),
                 actions = {
-                    IconButton(onClick = { fetchComplaints() }) {
+                    IconButton(onClick = { HostelRepository.refreshFromSupabase() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = TextPrimary)
                     }
                 }
@@ -271,19 +238,7 @@ fun ComplaintsScreen() {
                                 isAdmin = isUserAdmin,
                                 onImageClick = { previewImageUrl = it },
                                 onStatusUpdate = { newStatus ->
-                                    scope.launch {
-                                        try {
-                                            SupabaseProvider.db.from("complaints")
-                                                .update({ set("status", newStatus) }) {
-                                                    filter { eq("id", complaint.id) }
-                                                }
-                                            fetchComplaints()
-                                        } catch (_: Exception) {
-                                            complaints = complaints.map {
-                                                if (it.id == complaint.id) it.copy(status = newStatus) else it
-                                            }
-                                        }
-                                    }
+                                    HostelRepository.updateComplaintStatus(complaint.id, newStatus)
                                 }
                             )
                         }
@@ -337,35 +292,19 @@ fun ComplaintsScreen() {
                     onDismiss = { showDialog = false },
                     onSubmit = { title, desc, category, photoPath ->
                         showDialog = false
-                        scope.launch {
-                            try {
-                                val userId = SupabaseProvider.auth.currentUserOrNull()?.id ?: ""
-                                val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date())
-                                val newComplaint = Complaint(
-                                    title = title,
-                                    description = desc,
-                                    category = category,
-                                    studentId = userId,
-                                    status = "Submitted",
-                                    photoUrl = photoPath,
-                                    createdAt = timestamp
-                                )
-                                SupabaseProvider.db.from("complaints").insert(newComplaint)
-                                fetchComplaints()
-                            } catch (_: Exception) {
-                                complaints = listOf(
-                                    Complaint(
-                                        id = UUID.randomUUID().toString(),
-                                        title = title,
-                                        description = desc,
-                                        category = category,
-                                        status = "Submitted",
-                                        photoUrl = photoPath,
-                                        createdAt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date())
-                                    )
-                                ) + complaints
-                            }
-                        }
+                        val userId = SupabaseProvider.auth.currentUserOrNull()?.id ?: ""
+                        val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date())
+                        val newComplaint = Complaint(
+                            id = UUID.randomUUID().toString(),
+                            title = title,
+                            description = desc,
+                            category = category,
+                            studentId = userId,
+                            status = "Submitted",
+                            photoUrl = photoPath,
+                            createdAt = timestamp
+                        )
+                        HostelRepository.addComplaint(newComplaint)
                     }
                 )
             }

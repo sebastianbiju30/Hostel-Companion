@@ -26,6 +26,7 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.hostel_companion.data.SupabaseProvider
 import com.example.hostel_companion.data.models.*
+import com.example.hostel_companion.data.repository.HostelRepository
 import com.example.hostel_companion.ui.theme.*
 import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.launch
@@ -37,15 +38,15 @@ import java.util.*
 fun AdminDashboardScreen(navController: NavController) {
     // 0: Complaints, 1: Room Allocation, 2: Mess Menu, 3: Visitors, 4: Events, 5: Laundry, 6: Parcels
     var selectedTab by remember { mutableIntStateOf(0) }
-    var complaints by remember { mutableStateOf<List<Complaint>>(emptyList()) }
-    var profilesList by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
-    var roomsList by remember { mutableStateOf<List<Room>>(emptyList()) }
-    var messMenuItems by remember { mutableStateOf<List<MessMenu>>(emptyList()) }
-    var visitors by remember { mutableStateOf<List<Visitor>>(emptyList()) }
-    var events by remember { mutableStateOf<List<Event>>(emptyList()) }
-    var laundryOrders by remember { mutableStateOf<List<LaundryOrder>>(emptyList()) }
-    var parcels by remember { mutableStateOf<List<Parcel>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
+    val complaints by HostelRepository.complaints.collectAsState()
+    val profilesList by HostelRepository.profiles.collectAsState()
+    val roomsList by HostelRepository.rooms.collectAsState()
+    val messMenuItems by HostelRepository.messMenu.collectAsState()
+    val visitors by HostelRepository.visitors.collectAsState()
+    val events by HostelRepository.events.collectAsState()
+    val laundryOrders by HostelRepository.laundryOrders.collectAsState()
+    val parcels by HostelRepository.parcels.collectAsState()
+    var isLoading by remember { mutableStateOf(false) }
     var previewImageUrl by remember { mutableStateOf<String?>(null) }
 
     // Dialog States
@@ -59,104 +60,7 @@ fun AdminDashboardScreen(navController: NavController) {
     val scope = rememberCoroutineScope()
 
     fun refreshAllData() {
-        scope.launch {
-            isLoading = true
-            try {
-                complaints = SupabaseProvider.db.from("complaints").select().decodeList<Complaint>()
-            } catch (_: Exception) {
-                if (complaints.isEmpty()) {
-                    complaints = listOf(
-                        Complaint(id = "c1", title = "AC Not Cooling (Ref #204)", category = "AC", status = "In Progress", description = "Warm air coming from AC unit in Room A-304."),
-                        Complaint(id = "c2", title = "Washroom Water Leakage", category = "Plumbing", status = "Submitted", description = "Sink pipe dripping continuously in Room B-102."),
-                        Complaint(id = "c3", title = "Ceiling Fan Clicking Noise", category = "Electrical", status = "Assigned", description = "Regulator sparking on speed 4.")
-                    )
-                }
-            }
-
-            try {
-                profilesList = SupabaseProvider.db.from("profiles").select().decodeList<UserProfile>()
-            } catch (_: Exception) {
-                if (profilesList.isEmpty()) {
-                    profilesList = listOf(
-                        UserProfile(id = "p1", fullName = "Sebastian Biju", email = "sebastianbiju30@gmail.com", role = "student", roomId = "r1"),
-                        UserProfile(id = "p2", fullName = "Rahul Sharma", email = "rahul.sharma@hostel.edu", role = "student", roomId = "r1"),
-                        UserProfile(id = "p3", fullName = "Amit Patel", email = "amit.patel@hostel.edu", role = "student", roomId = "r2"),
-                        UserProfile(id = "p4", fullName = "Karan Verma", email = "karan.v@hostel.edu", role = "student", roomId = null)
-                    )
-                }
-            }
-
-            try {
-                roomsList = SupabaseProvider.db.from("rooms").select().decodeList<Room>()
-            } catch (_: Exception) {
-                if (roomsList.isEmpty()) {
-                    roomsList = listOf(
-                        Room(id = "r1", roomNumber = "A-304", block = "North Block", capacity = 2),
-                        Room(id = "r2", roomNumber = "B-102", block = "South Block", capacity = 2),
-                        Room(id = "r3", roomNumber = "C-205", block = "West Block", capacity = 3)
-                    )
-                }
-            }
-
-            try {
-                messMenuItems = SupabaseProvider.db.from("mess_menu").select().decodeList<MessMenu>()
-            } catch (_: Exception) {
-                if (messMenuItems.isEmpty()) {
-                    messMenuItems = listOf(
-                        MessMenu(id = "m1", day = "Monday", meal = "Breakfast", items = "Aloo Paratha, Curd, Boiled Eggs, Tea", calories = 520, serveTime = "07:30 AM - 09:30 AM"),
-                        MessMenu(id = "m2", day = "Monday", meal = "Lunch", items = "Rajma Masala, Jeera Rice, Phulka, Boondi Raita", calories = 740, serveTime = "12:30 PM - 02:30 PM"),
-                        MessMenu(id = "m3", day = "Monday", meal = "Snacks", items = "Crispy Veg Cutlet, Filter Coffee / Tea", calories = 310, serveTime = "05:00 PM - 06:00 PM"),
-                        MessMenu(id = "m4", day = "Monday", meal = "Dinner", items = "Kadai Paneer, Yellow Dal, Tawa Roti, Rice, Custard", calories = 680, serveTime = "07:30 PM - 09:30 PM")
-                    )
-                }
-            }
-
-            try {
-                visitors = SupabaseProvider.db.from("visitors").select().decodeList<Visitor>()
-            } catch (_: Exception) {
-                if (visitors.isEmpty()) {
-                    visitors = listOf(
-                        Visitor(id = "v1", visitorName = "Suresh Biju (Parent)", visitorPhone = "+91 98765 11111", purpose = "Family Visit & Fee Submission", status = "Pending"),
-                        Visitor(id = "v2", visitorName = "Anil Kumar", visitorPhone = "+91 98765 22222", purpose = "Study Project Discussion", status = "Approved")
-                    )
-                }
-            }
-
-            try {
-                events = SupabaseProvider.db.from("events").select().decodeList<Event>()
-            } catch (_: Exception) {
-                if (events.isEmpty()) {
-                    events = listOf(
-                        Event(id = "e1", title = "Tarang Annual Cultural Fest", eventDate = "Nov 08 • 06:00 PM", location = "Campus Amphitheatre", description = "Concert, DJ & food stalls"),
-                        Event(id = "e2", title = "Inter-Hostel Cricket Cup", eventDate = "Nov 09 • 04:00 PM", location = "Hostel Sports Ground", description = "North vs South Block")
-                    )
-                }
-            }
-
-            try {
-                laundryOrders = SupabaseProvider.db.from("laundry_orders").select().decodeList<LaundryOrder>()
-            } catch (_: Exception) {
-                if (laundryOrders.isEmpty()) {
-                    laundryOrders = listOf(
-                        LaundryOrder(id = "l1", studentId = "p1", itemsCount = 8, status = "Washing", droppedAt = "Yesterday 04:00 PM"),
-                        LaundryOrder(id = "l2", studentId = "p2", itemsCount = 5, status = "Ready", droppedAt = "2 Days Ago")
-                    )
-                }
-            }
-
-            try {
-                parcels = SupabaseProvider.db.from("parcels").select().decodeList<Parcel>()
-            } catch (_: Exception) {
-                if (parcels.isEmpty()) {
-                    parcels = listOf(
-                        Parcel(id = "pr1", sender = "Amazon Delivery", description = "Electronics / Laptop Cable", status = "Ready for Pickup", arrivedAt = "Today 11:30 AM"),
-                        Parcel(id = "pr2", sender = "Flipkart Package", description = "Books & Stationery", status = "Arrived", arrivedAt = "Yesterday 05:00 PM")
-                    )
-                }
-            }
-
-            isLoading = false
-        }
+        HostelRepository.refreshFromSupabase()
     }
 
     LaunchedEffect(Unit) {
@@ -243,17 +147,7 @@ fun AdminDashboardScreen(navController: NavController) {
                             complaints = complaints,
                             onImageClick = { previewImageUrl = it },
                             onStatusUpdate = { complaint, newStatus ->
-                                scope.launch {
-                                    try {
-                                        SupabaseProvider.db.from("complaints")
-                                            .update({ set("status", newStatus) }) {
-                                                filter { eq("id", complaint.id) }
-                                            }
-                                    } catch (_: Exception) {}
-                                    complaints = complaints.map {
-                                        if (it.id == complaint.id) it.copy(status = newStatus) else it
-                                    }
-                                }
+                                HostelRepository.updateComplaintStatus(complaint.id, newStatus)
                             }
                         )
 
@@ -280,30 +174,10 @@ fun AdminDashboardScreen(navController: NavController) {
                         3 -> WardenVisitorsView(
                             visitors = visitors,
                             onApprove = { visitor ->
-                                scope.launch {
-                                    try {
-                                        SupabaseProvider.db.from("visitors")
-                                            .update({ set("status", "Approved") }) {
-                                                filter { eq("id", visitor.id) }
-                                            }
-                                    } catch (_: Exception) {}
-                                    visitors = visitors.map {
-                                        if (it.id == visitor.id) it.copy(status = "Approved") else it
-                                    }
-                                }
+                                HostelRepository.updateVisitorStatus(visitor.id, "Approved")
                             },
                             onReject = { visitor ->
-                                scope.launch {
-                                    try {
-                                        SupabaseProvider.db.from("visitors")
-                                            .update({ set("status", "Rejected") }) {
-                                                filter { eq("id", visitor.id) }
-                                            }
-                                    } catch (_: Exception) {}
-                                    visitors = visitors.map {
-                                        if (it.id == visitor.id) it.copy(status = "Rejected") else it
-                                    }
-                                }
+                                HostelRepository.updateVisitorStatus(visitor.id, "Rejected")
                             }
                         )
 
@@ -312,12 +186,7 @@ fun AdminDashboardScreen(navController: NavController) {
                             events = events,
                             onAddEventClick = { showAddEventDialog = true },
                             onDeleteEvent = { eventId ->
-                                scope.launch {
-                                    try {
-                                        SupabaseProvider.db.from("events").delete { filter { eq("id", eventId) } }
-                                    } catch (_: Exception) {}
-                                    events = events.filter { it.id != eventId }
-                                }
+                                HostelRepository.deleteEvent(eventId)
                             }
                         )
 
@@ -325,17 +194,7 @@ fun AdminDashboardScreen(navController: NavController) {
                         5 -> WardenLaundryView(
                             orders = laundryOrders,
                             onUpdateStatus = { order, newStatus ->
-                                scope.launch {
-                                    try {
-                                        SupabaseProvider.db.from("laundry_orders")
-                                            .update({ set("status", newStatus) }) {
-                                                filter { eq("id", order.id) }
-                                            }
-                                    } catch (_: Exception) {}
-                                    laundryOrders = laundryOrders.map {
-                                        if (it.id == order.id) it.copy(status = newStatus) else it
-                                    }
-                                }
+                                HostelRepository.updateLaundryStatus(order.id, newStatus)
                             }
                         )
 
@@ -344,17 +203,7 @@ fun AdminDashboardScreen(navController: NavController) {
                             parcels = parcels,
                             onAddParcelClick = { showAddParcelDialog = true },
                             onUpdateStatus = { parcel, newStatus ->
-                                scope.launch {
-                                    try {
-                                        SupabaseProvider.db.from("parcels")
-                                            .update({ set("status", newStatus) }) {
-                                                filter { eq("id", parcel.id) }
-                                            }
-                                    } catch (_: Exception) {}
-                                    parcels = parcels.map {
-                                        if (it.id == parcel.id) it.copy(status = newStatus) else it
-                                    }
-                                }
+                                HostelRepository.updateParcelStatus(parcel.id, newStatus)
                             }
                         )
                     }
@@ -420,22 +269,12 @@ fun AdminDashboardScreen(navController: NavController) {
                         onClick = {
                             val student = selectedStudentForRoom!!
                             showRoomAllocDialog = false
-                            scope.launch {
-                                try {
-                                    // Upsert room
-                                    val roomId = UUID.randomUUID().toString()
-                                    SupabaseProvider.db.from("rooms").insert(
-                                        Room(id = roomId, roomNumber = inputRoomNumber.trim(), block = inputBlock.trim())
-                                    )
-                                    // Update student profile
-                                    SupabaseProvider.db.from("profiles")
-                                        .update({ set("room_id", roomId) }) {
-                                            filter { eq("id", student.id) }
-                                        }
-                                } catch (_: Exception) {}
-                                profilesList = profilesList.map {
-                                    if (it.id == student.id) it.copy(roomId = inputRoomNumber) else it
-                                }
+                            if (inputRoomNumber.isNotBlank()) {
+                                HostelRepository.allocateRoom(
+                                    studentId = student.id,
+                                    roomNumber = inputRoomNumber.trim(),
+                                    block = inputBlock.trim()
+                                )
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = AccentAmber)
@@ -489,25 +328,12 @@ fun AdminDashboardScreen(navController: NavController) {
                         onClick = {
                             val meal = selectedMessToEdit!!
                             showEditMessDialog = false
-                            scope.launch {
-                                try {
-                                    SupabaseProvider.db.from("mess_menu")
-                                        .update({
-                                            set("items", itemsText.trim())
-                                            set("serve_time", timingText.trim())
-                                            set("calories", caloriesText.toIntOrNull() ?: 650)
-                                        }) {
-                                            filter { eq("id", meal.id) }
-                                        }
-                                } catch (_: Exception) {}
-                                messMenuItems = messMenuItems.map {
-                                    if (it.id == meal.id) it.copy(
-                                        items = itemsText.trim(),
-                                        serveTime = timingText.trim(),
-                                        calories = caloriesText.toIntOrNull() ?: 650
-                                    ) else it
-                                }
-                            }
+                            HostelRepository.updateMessMenuItem(
+                                mealId = meal.id,
+                                items = itemsText.trim(),
+                                serveTime = timingText.trim(),
+                                calories = caloriesText.toIntOrNull() ?: 650
+                            )
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = AccentAmber)
                     ) {
@@ -544,19 +370,14 @@ fun AdminDashboardScreen(navController: NavController) {
                         onClick = {
                             if (eventTitle.isNotBlank()) {
                                 showAddEventDialog = false
-                                scope.launch {
-                                    val newEv = Event(
-                                        id = UUID.randomUUID().toString(),
-                                        title = eventTitle.trim(),
-                                        eventDate = eventDate.trim(),
-                                        location = eventLocation.trim(),
-                                        description = eventDesc.trim()
-                                    )
-                                    try {
-                                        SupabaseProvider.db.from("events").insert(newEv)
-                                    } catch (_: Exception) {}
-                                    events = listOf(newEv) + events
-                                }
+                                val newEv = Event(
+                                    id = UUID.randomUUID().toString(),
+                                    title = eventTitle.trim(),
+                                    eventDate = eventDate.trim(),
+                                    location = eventLocation.trim(),
+                                    description = eventDesc.trim()
+                                )
+                                HostelRepository.addEvent(newEv)
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = AccentAmber)
@@ -590,19 +411,14 @@ fun AdminDashboardScreen(navController: NavController) {
                         onClick = {
                             if (parcelSender.isNotBlank()) {
                                 showAddParcelDialog = false
-                                scope.launch {
-                                    val newP = Parcel(
-                                        id = UUID.randomUUID().toString(),
-                                        sender = parcelSender.trim(),
-                                        description = parcelDesc.trim(),
-                                        status = "Ready for Pickup",
-                                        arrivedAt = SimpleDateFormat("hh:mm a, dd MMM", Locale.US).format(Date())
-                                    )
-                                    try {
-                                        SupabaseProvider.db.from("parcels").insert(newP)
-                                    } catch (_: Exception) {}
-                                    parcels = listOf(newP) + parcels
-                                }
+                                val newP = Parcel(
+                                    id = UUID.randomUUID().toString(),
+                                    sender = parcelSender.trim(),
+                                    description = parcelDesc.trim(),
+                                    status = "Ready for Pickup",
+                                    arrivedAt = SimpleDateFormat("hh:mm a, dd MMM", Locale.US).format(Date())
+                                )
+                                HostelRepository.addParcel(newP)
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = AccentAmber)

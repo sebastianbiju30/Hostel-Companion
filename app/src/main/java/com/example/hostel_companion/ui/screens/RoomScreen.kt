@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import com.example.hostel_companion.data.SupabaseProvider
 import com.example.hostel_companion.data.models.Room
 import com.example.hostel_companion.data.models.UserProfile
+import com.example.hostel_companion.data.repository.HostelRepository
 import com.example.hostel_companion.ui.theme.*
 import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.launch
@@ -27,10 +28,21 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RoomScreen() {
-    var roomInfo by remember { mutableStateOf<Room?>(null) }
-    var userProfile by remember { mutableStateOf<UserProfile?>(null) }
-    var roommates by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
+    val allProfiles by HostelRepository.profiles.collectAsState()
+    val allRooms by HostelRepository.rooms.collectAsState()
+
+    val currentUserId = SupabaseProvider.auth.currentUserOrNull()?.id
+    val userProfile = allProfiles.firstOrNull { it.id == currentUserId } ?: allProfiles.firstOrNull()
+    val roomInfo = allRooms.firstOrNull { it.id == userProfile?.roomId }
+        ?: allRooms.firstOrNull { it.roomNumber.equals(userProfile?.roomId, true) }
+        ?: allRooms.firstOrNull()
+        ?: Room(id = "r304", roomNumber = "A-304", block = "North Block", capacity = 2)
+
+    val roommates = allProfiles.filter {
+        (it.roomId == roomInfo.id || it.roomId == roomInfo.roomNumber) && it.id != userProfile?.id
+    }
+
+    var isLoading by remember { mutableStateOf(false) }
     var showTransferDialog by remember { mutableStateOf(false) }
     var transferReason by remember { mutableStateOf("") }
     var transferSuccessMessage by remember { mutableStateOf<String?>(null) }
@@ -38,41 +50,7 @@ fun RoomScreen() {
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
-        scope.launch {
-            try {
-                val userId = SupabaseProvider.auth.currentUserOrNull()?.id
-                if (userId != null) {
-                    userProfile = SupabaseProvider.db.from("profiles")
-                        .select { filter { eq("id", userId) } }
-                        .decodeSingleOrNull<UserProfile>()
-
-                    if (userProfile?.roomId != null) {
-                        roomInfo = SupabaseProvider.db.from("rooms")
-                            .select { filter { eq("id", userProfile!!.roomId!!) } }
-                            .decodeSingleOrNull<Room>()
-
-                        roommates = SupabaseProvider.db.from("profiles")
-                            .select { filter { eq("room_id", userProfile!!.roomId!!) } }
-                            .decodeList<UserProfile>()
-                    }
-                }
-            } catch (_: Exception) {
-            } finally {
-                if (roomInfo == null) {
-                    roomInfo = Room(
-                        id = "r304",
-                        roomNumber = "A-304",
-                        block = "North Block",
-                        capacity = 2
-                    )
-                    roommates = listOf(
-                        UserProfile(fullName = "Sebastian Biju (You)", email = "sebastianbiju30@gmail.com", phone = "+91 98765 43210"),
-                        UserProfile(fullName = "Rahul Sharma", email = "rahul.sharma@hostel.edu", phone = "+91 98765 12345")
-                    )
-                }
-                isLoading = false
-            }
-        }
+        HostelRepository.refreshFromSupabase()
     }
 
     Scaffold(
@@ -130,12 +108,12 @@ fun RoomScreen() {
                                 Spacer(modifier = Modifier.width(14.dp))
                                 Column {
                                     Text(
-                                        text = "Room ${roomInfo?.roomNumber ?: "A-304"}",
+                                        text = "Room ${roomInfo.roomNumber}",
                                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                                         color = TextPrimary
                                     )
                                     Text(
-                                        text = "${roomInfo?.block ?: "North Block"} • 3rd Floor",
+                                        text = "${roomInfo.block ?: "North Block"} • 3rd Floor",
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = TextCyan
                                     )
@@ -165,7 +143,7 @@ fun RoomScreen() {
                         ) {
                             Column {
                                 Text("Room Capacity", style = MaterialTheme.typography.labelSmall, color = TextMuted)
-                                Text("${roomInfo?.capacity ?: 2} Sharing Beds", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = TextPrimary)
+                                Text("${roomInfo.capacity} Sharing Beds", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = TextPrimary)
                             }
                             Column {
                                 Text("Your Bed Number", style = MaterialTheme.typography.labelSmall, color = TextMuted)
@@ -212,50 +190,65 @@ fun RoomScreen() {
                 )
 
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    roommates.forEach { roommate ->
+                    if (roommates.isEmpty()) {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
+                            shape = RoundedCornerShape(14.dp),
                             colors = CardDefaults.cardColors(containerColor = DarkCardSurface)
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                            Text(
+                                "No other roommates currently allotted to this room.",
+                                color = TextMuted,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(14.dp)
+                            )
+                        }
+                    } else {
+                        roommates.forEach { roommate ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = DarkCardSurface)
                             ) {
-                                Box(
+                                Row(
                                     modifier = Modifier
-                                        .size(42.dp)
-                                        .clip(CircleShape)
-                                        .background(DarkCardSurfaceVariant),
-                                    contentAlignment = Alignment.Center
+                                        .fillMaxWidth()
+                                        .padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.Person, contentDescription = null, tint = AccentTeal)
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = roommate.fullName ?: "Resident Student",
-                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = TextPrimary
-                                    )
-                                    Text(
-                                        text = roommate.email ?: "student@hostel.edu",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = TextMuted
-                                    )
-                                }
-                                Surface(
-                                    color = DarkCardSurfaceVariant,
-                                    shape = RoundedCornerShape(6.dp)
-                                ) {
-                                    Text(
-                                        text = "Active",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = StatusGreen,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(42.dp)
+                                            .clip(CircleShape)
+                                            .background(DarkCardSurfaceVariant),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.Person, contentDescription = null, tint = AccentTeal)
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = roommate.fullName ?: "Resident Student",
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                            color = TextPrimary
+                                        )
+                                        Text(
+                                            text = roommate.email ?: "student@hostel.edu",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = TextMuted
+                                        )
+                                    }
+                                    Surface(
+                                        color = DarkCardSurfaceVariant,
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) {
+                                        Text(
+                                            text = "Active",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = StatusGreen,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                        )
+                                    }
                                 }
                             }
                         }

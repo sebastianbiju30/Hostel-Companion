@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.hostel_companion.data.SupabaseProvider
 import com.example.hostel_companion.data.models.LaundryOrder
+import com.example.hostel_companion.data.repository.HostelRepository
 import com.example.hostel_companion.ui.theme.*
 import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.launch
@@ -27,28 +28,14 @@ import java.util.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LaundryScreen() {
-    var orders by remember { mutableStateOf<List<LaundryOrder>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
+    val orders by HostelRepository.laundryOrders.collectAsState()
+    var isLoading by remember { mutableStateOf(false) }
     var showDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    fun fetchLaundry() {
-        scope.launch {
-            isLoading = true
-            try {
-                orders = SupabaseProvider.db.from("laundry_orders").select().decodeList<LaundryOrder>()
-            } catch (_: Exception) {
-                orders = listOf(
-                    LaundryOrder(id = "l101", itemsCount = 7, status = "Washing", droppedAt = "Yesterday, 04:30 PM"),
-                    LaundryOrder(id = "l102", itemsCount = 4, status = "Ready", droppedAt = "Oct 20, 11:00 AM")
-                )
-            } finally {
-                isLoading = false
-            }
-        }
+    LaunchedEffect(Unit) {
+        HostelRepository.refreshFromSupabase()
     }
-
-    LaunchedEffect(Unit) { fetchLaundry() }
 
     Scaffold(
         containerColor = DarkBackground,
@@ -62,7 +49,7 @@ fun LaundryScreen() {
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkCardSurface),
                 actions = {
-                    IconButton(onClick = { fetchLaundry() }) {
+                    IconButton(onClick = { HostelRepository.refreshFromSupabase() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = TextPrimary)
                     }
                 }
@@ -203,22 +190,15 @@ fun LaundryScreen() {
                         Button(
                             onClick = {
                                 showDialog = false
-                                scope.launch {
-                                    try {
-                                        val userId = SupabaseProvider.auth.currentUserOrNull()?.id ?: ""
-                                        val newOrder = LaundryOrder(
-                                            id = UUID.randomUUID().toString(),
-                                            studentId = userId,
-                                            itemsCount = count.toIntOrNull() ?: 5,
-                                            status = "Dropped",
-                                            droppedAt = SimpleDateFormat("hh:mm a, dd MMM", Locale.US).format(Date())
-                                        )
-                                        try {
-                                            SupabaseProvider.db.from("laundry_orders").insert(newOrder)
-                                        } catch (_: Exception) {}
-                                        orders = listOf(newOrder) + orders
-                                    } catch (_: Exception) {}
-                                }
+                                val userId = SupabaseProvider.auth.currentUserOrNull()?.id ?: ""
+                                val newOrder = LaundryOrder(
+                                    id = UUID.randomUUID().toString(),
+                                    studentId = userId,
+                                    itemsCount = count.toIntOrNull() ?: 5,
+                                    status = "Dropped",
+                                    droppedAt = SimpleDateFormat("hh:mm a, dd MMM", Locale.US).format(Date())
+                                )
+                                HostelRepository.addLaundryOrder(newOrder)
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = AccentTeal)
                         ) {

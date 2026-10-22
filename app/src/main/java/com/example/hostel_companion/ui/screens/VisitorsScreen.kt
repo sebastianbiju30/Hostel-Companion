@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.hostel_companion.data.SupabaseProvider
 import com.example.hostel_companion.data.models.Visitor
+import com.example.hostel_companion.data.repository.HostelRepository
 import com.example.hostel_companion.ui.theme.*
 import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.launch
@@ -28,42 +29,14 @@ import java.util.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VisitorsScreen() {
-    var visitors by remember { mutableStateOf<List<Visitor>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
+    val visitors by HostelRepository.visitors.collectAsState()
+    var isLoading by remember { mutableStateOf(false) }
     var showDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    fun fetchVisitors() {
-        scope.launch {
-            isLoading = true
-            try {
-                visitors = SupabaseProvider.db.from("visitors").select().decodeList<Visitor>()
-            } catch (_: Exception) {
-                visitors = listOf(
-                    Visitor(
-                        id = "v101",
-                        visitorName = "Suresh Biju (Father)",
-                        visitorPhone = "+91 98765 11111",
-                        purpose = "Family Weekend Visit & Fee Clearance",
-                        status = "Approved",
-                        requestedAt = "2026-10-21T10:00:00Z"
-                    ),
-                    Visitor(
-                        id = "v102",
-                        visitorName = "Anil Kumar (Friend)",
-                        visitorPhone = "+91 98765 22222",
-                        purpose = "Group Study & Project Discussion",
-                        status = "Pending",
-                        requestedAt = "2026-10-22T14:30:00Z"
-                    )
-                )
-            } finally {
-                isLoading = false
-            }
-        }
+    LaunchedEffect(Unit) {
+        HostelRepository.refreshFromSupabase()
     }
-
-    LaunchedEffect(Unit) { fetchVisitors() }
 
     Scaffold(
         containerColor = DarkBackground,
@@ -77,7 +50,7 @@ fun VisitorsScreen() {
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkCardSurface),
                 actions = {
-                    IconButton(onClick = { fetchVisitors() }) {
+                    IconButton(onClick = { HostelRepository.refreshFromSupabase() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = TextPrimary)
                     }
                 }
@@ -241,24 +214,17 @@ fun VisitorsScreen() {
                             onClick = {
                                 if (name.isNotBlank()) {
                                     showDialog = false
-                                    scope.launch {
-                                        try {
-                                            val userId = SupabaseProvider.auth.currentUserOrNull()?.id ?: ""
-                                            val newV = Visitor(
-                                                id = UUID.randomUUID().toString(),
-                                                studentId = userId,
-                                                visitorName = name.trim(),
-                                                visitorPhone = phone.trim(),
-                                                purpose = purpose.trim(),
-                                                status = "Pending",
-                                                requestedAt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date())
-                                            )
-                                            try {
-                                                SupabaseProvider.db.from("visitors").insert(newV)
-                                            } catch (_: Exception) {}
-                                            visitors = listOf(newV) + visitors
-                                        } catch (_: Exception) {}
-                                    }
+                                    val userId = SupabaseProvider.auth.currentUserOrNull()?.id ?: ""
+                                    val newV = Visitor(
+                                        id = UUID.randomUUID().toString(),
+                                        studentId = userId,
+                                        visitorName = name.trim(),
+                                        visitorPhone = phone.trim(),
+                                        purpose = purpose.trim(),
+                                        status = "Pending",
+                                        requestedAt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date())
+                                    )
+                                    HostelRepository.addVisitor(newV)
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = AccentTeal)

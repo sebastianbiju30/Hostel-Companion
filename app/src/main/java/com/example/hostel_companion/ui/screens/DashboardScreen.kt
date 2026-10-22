@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.hostel_companion.data.SupabaseProvider
 import com.example.hostel_companion.data.models.*
+import com.example.hostel_companion.data.repository.HostelRepository
 import com.example.hostel_companion.ui.theme.*
 import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.launch
@@ -36,17 +37,30 @@ fun DashboardScreen(navController: NavController) {
     val user = SupabaseProvider.auth.currentUserOrNull()
     val userName = user?.email?.substringBefore("@")?.replaceFirstChar { it.uppercase() } ?: "Sebastian"
 
+    val allComplaints by HostelRepository.complaints.collectAsState()
+    val allRooms by HostelRepository.rooms.collectAsState()
+    val allProfiles by HostelRepository.profiles.collectAsState()
+    val allVisitors by HostelRepository.visitors.collectAsState()
+    val allMessMenu by HostelRepository.messMenu.collectAsState()
+
+    val currentProfile = allProfiles.firstOrNull { it.id == user?.id }
+    val assignedRoom = allRooms.firstOrNull { it.id == currentProfile?.roomId }?.roomNumber
+        ?: allRooms.firstOrNull()?.roomNumber ?: "A-304"
+
     var roomNumber by remember { mutableStateOf("A-304") }
+    roomNumber = assignedRoom
+
     var messBalance by remember { mutableStateOf("₹2,450") }
-    var activeComplaint by remember { mutableStateOf<Complaint?>(null) }
+    val activeComplaint = allComplaints.firstOrNull { it.status.lowercase() != "resolved" } ?: allComplaints.firstOrNull()
+    val latestVisitor = allVisitors.firstOrNull()
     var latestNotice by remember { mutableStateOf<Notice?>(null) }
-    var latestVisitor by remember { mutableStateOf<Visitor?>(null) }
     var emergencyContacts by remember { mutableStateOf<List<EmergencyContact>>(emptyList()) }
     var isUserAdmin by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
+        HostelRepository.refreshFromSupabase()
         scope.launch {
             try {
                 val userId = user?.id ?: ""
@@ -56,33 +70,16 @@ fun DashboardScreen(navController: NavController) {
                 if (profile?.isAdmin == true) {
                     isUserAdmin = true
                 }
-                if (profile?.roomId != null) {
-                    val room = SupabaseProvider.db.from("rooms")
-                        .select { filter { eq("id", profile.roomId) } }
-                        .decodeSingleOrNull<Room>()
-                    if (room != null) roomNumber = room.roomNumber
-                }
-
-                val complaints = SupabaseProvider.db.from("complaints")
-                    .select { filter { eq("student_id", userId) } }
-                    .decodeList<Complaint>()
-                activeComplaint = complaints.firstOrNull { it.status.lowercase() != "resolved" } ?: complaints.firstOrNull()
 
                 val notices = SupabaseProvider.db.from("notices")
                     .select()
                     .decodeList<Notice>()
                 latestNotice = notices.firstOrNull()
 
-                val visitors = SupabaseProvider.db.from("visitors")
-                    .select { filter { eq("student_id", userId) } }
-                    .decodeList<Visitor>()
-                latestVisitor = visitors.firstOrNull()
-
                 emergencyContacts = SupabaseProvider.db.from("emergency_contacts")
                     .select()
                     .decodeList<EmergencyContact>()
-            } catch (_: Exception) {
-            }
+            } catch (_: Exception) {}
         }
     }
 
@@ -330,6 +327,7 @@ fun DashboardScreen(navController: NavController) {
             item {
                 val complaintTitle = activeComplaint?.title ?: "AC Not Cooling (Ref #204)"
                 val complaintStatus = activeComplaint?.status ?: "In Progress"
+                val statusLower = complaintStatus.lowercase()
 
                 Card(
                     modifier = Modifier
@@ -356,14 +354,21 @@ fun DashboardScreen(navController: NavController) {
                                     color = TextMuted
                                 )
                             }
+                            val (badgeBg, badgeColor) = when (statusLower) {
+                                "resolved" -> Pair(StatusGreen.copy(alpha = 0.2f), StatusGreen)
+                                "in progress" -> Pair(AccentAmber.copy(alpha = 0.2f), AccentAmber)
+                                "assigned" -> Pair(AccentBlueLight.copy(alpha = 0.2f), AccentBlueLight)
+                                else -> Pair(StatusRed.copy(alpha = 0.2f), StatusRed)
+                            }
+
                             Surface(
-                                color = Color(0xFF451A03),
+                                color = badgeBg,
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text(
                                     text = complaintStatus.uppercase(),
                                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = AccentAmber,
+                                    color = badgeColor,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             }
@@ -376,11 +381,15 @@ fun DashboardScreen(navController: NavController) {
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            val statusLower = complaintStatus.lowercase()
-                            StepItem("SUBMITTED", isCompleted = true, isActive = false)
-                            StepItem("ASSIGNED", isCompleted = statusLower in listOf("assigned", "in progress", "resolved"), isActive = false)
-                            StepItem("IN PROGRESS", isCompleted = statusLower == "resolved", isActive = statusLower == "in progress")
-                            StepItem("RESOLVED", isCompleted = false, isActive = statusLower == "resolved")
+                            val isResolved = statusLower == "resolved"
+                            val isInProgress = statusLower == "in progress"
+                            val isAssigned = statusLower == "assigned"
+                            val isSubmitted = statusLower == "submitted"
+
+                            StepItem("SUBMITTED", isCompleted = !isSubmitted, isActive = isSubmitted)
+                            StepItem("ASSIGNED", isCompleted = isInProgress || isResolved, isActive = isAssigned)
+                            StepItem("IN PROGRESS", isCompleted = isResolved, isActive = isInProgress)
+                            StepItem("RESOLVED", isCompleted = isResolved, isActive = false)
                         }
                     }
                 }

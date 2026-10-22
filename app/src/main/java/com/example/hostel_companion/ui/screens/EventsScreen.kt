@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.hostel_companion.data.SupabaseProvider
 import com.example.hostel_companion.data.models.Event
+import com.example.hostel_companion.data.repository.HostelRepository
 import com.example.hostel_companion.ui.theme.*
 import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.launch
@@ -29,78 +30,16 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EventsScreen() {
-    var events by remember { mutableStateOf<List<Event>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
+    val events by HostelRepository.events.collectAsState()
+    var isLoading by remember { mutableStateOf(false) }
     var selectedCategory by remember { mutableStateOf("All") }
     var registeredEventIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     val scope = rememberCoroutineScope()
 
     val categories = listOf("All", "Cultural", "Sports", "Technical", "Social")
 
-    // Vibrant default events list for full content
-    val defaultEvents = remember {
-        listOf(
-            Event(
-                id = "e1",
-                title = "Tarang - Annual Cultural & Music Fest",
-                description = "Live DJ, inter-hostel dance & acoustic battles, food trucks, and celebrity concert night! Free entry for all hostel residents.",
-                location = "Campus Open Air Amphitheatre",
-                eventDate = "Sat, Nov 08 • 06:00 PM"
-            ),
-            Event(
-                id = "e2",
-                title = "Hostel Premier League (HPL) T20 Cricket",
-                description = "North Block vs South Block clash in the opening match of the annual inter-block trophy. Come cheer for your block!",
-                location = "Hostel Main Sports Ground",
-                eventDate = "Sun, Nov 09 • 04:00 PM"
-            ),
-            Event(
-                id = "e3",
-                title = "24-Hour CodeNight Hackathon 2026",
-                description = "Build innovative AI & IoT solutions overnight. Free midnight pizza, energy drinks, and cash prizes worth ₹50,000.",
-                location = "Innovation & Computing Lab (Block C)",
-                eventDate = "Fri, Nov 14 • 07:00 PM"
-            ),
-            Event(
-                id = "e4",
-                title = "Hostel Movie Night & Open Popcorn",
-                description = "Big screen projector screening of latest blockbuster selected by student poll. Bring your beanbags and blankets!",
-                location = "Common Room Hall (1st Floor)",
-                eventDate = "Sat, Nov 15 • 08:30 PM"
-            ),
-            Event(
-                id = "e5",
-                title = "Inter-Hostel Badminton & Table Tennis Cup",
-                description = "Singles and doubles knockout tournament under lights. Medals & certificates for all finalists.",
-                location = "Indoor Sports Complex",
-                eventDate = "Wed, Nov 19 • 05:30 PM"
-            ),
-            Event(
-                id = "e6",
-                title = "Campus Career & Internship Orientation",
-                description = "Alumni interactive panel on cracking top tech, finance, and core engineering summer internships.",
-                location = "Seminar Hall 2",
-                eventDate = "Mon, Nov 24 • 04:30 PM"
-            )
-        )
-    }
-
-    fun fetchEvents() {
-        scope.launch {
-            isLoading = true
-            try {
-                val dbEvents = SupabaseProvider.db.from("events").select().decodeList<Event>()
-                events = if (dbEvents.isNotEmpty()) dbEvents else defaultEvents
-            } catch (_: Exception) {
-                events = defaultEvents
-            } finally {
-                isLoading = false
-            }
-        }
-    }
-
     LaunchedEffect(Unit) {
-        fetchEvents()
+        HostelRepository.refreshFromSupabase()
     }
 
     val filteredEvents = events.filter { event ->
@@ -125,7 +64,7 @@ fun EventsScreen() {
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkCardSurface),
                 actions = {
-                    IconButton(onClick = { fetchEvents() }) {
+                    IconButton(onClick = { HostelRepository.refreshFromSupabase() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = TextPrimary)
                     }
                 }
