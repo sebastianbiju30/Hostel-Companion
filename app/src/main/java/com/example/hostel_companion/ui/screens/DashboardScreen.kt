@@ -186,45 +186,7 @@ fun DashboardScreen(navController: NavController) {
                 }
             }
 
-            // 2b. WARDEN CONTROL PANEL BANNER
-            item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { navController.navigate("admin_dashboard") },
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = if (isUserAdmin) "👑 Warden Control Center" else "🛡️ Open Warden / Admin Mode",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Text(
-                                text = "Resolve complaints, post notices, mess menu & events.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                            )
-                        }
-                        Icon(
-                            imageVector = Icons.Default.SupervisorAccount,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
-                }
-            }
-
-            // 2c. AI CAMPUS ASSISTANT BANNER
+            // 2b. AI CAMPUS ASSISTANT BANNER
             item {
                 Card(
                     modifier = Modifier

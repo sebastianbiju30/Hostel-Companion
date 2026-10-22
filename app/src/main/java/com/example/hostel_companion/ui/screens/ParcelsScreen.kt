@@ -1,14 +1,20 @@
 package com.example.hostel_companion.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.hostel_companion.data.SupabaseProvider
 import com.example.hostel_companion.data.models.Parcel
@@ -23,14 +29,16 @@ fun ParcelsScreen() {
     var isLoading by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
+    fun fetchParcels() {
         scope.launch {
+            isLoading = true
             try {
                 parcels = SupabaseProvider.db.from("parcels").select().decodeList<Parcel>()
             } catch (_: Exception) {
                 parcels = listOf(
-                    Parcel(id = "1", sender = "Amazon", description = "Books Package", status = "Ready for Pickup"),
-                    Parcel(id = "2", sender = "Flipkart", description = "Electronics", status = "Arrived")
+                    Parcel(id = "pr101", sender = "Amazon Delivery", description = "MacBook Charger & Electronics", status = "Ready for Pickup", arrivedAt = "Today, 11:30 AM"),
+                    Parcel(id = "pr102", sender = "Flipkart Package", description = "Engineering Textbooks & Notes", status = "Arrived", arrivedAt = "Yesterday, 04:00 PM"),
+                    Parcel(id = "pr103", sender = "BlueDart Express", description = "Home Documents & Sweets", status = "Collected", arrivedAt = "Oct 19, 02:15 PM")
                 )
             } finally {
                 isLoading = false
@@ -38,12 +46,24 @@ fun ParcelsScreen() {
         }
     }
 
+    LaunchedEffect(Unit) { fetchParcels() }
+
     Scaffold(
         containerColor = DarkBackground,
         topBar = {
             TopAppBar(
-                title = { Text("My Parcels", style = MaterialTheme.typography.titleLarge) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkCardSurface)
+                title = {
+                    Column {
+                        Text("Courier & Parcels Desk", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold), color = TextPrimary)
+                        Text("Collect packages from Security Gate Office", style = MaterialTheme.typography.bodySmall, color = AccentTeal)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkCardSurface),
+                actions = {
+                    IconButton(onClick = { fetchParcels() }) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = TextPrimary)
+                    }
+                }
             )
         }
     ) { padding ->
@@ -54,36 +74,92 @@ fun ParcelsScreen() {
                 .padding(16.dp)
         ) {
             if (isLoading) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = AccentPurple)
+            } else if (parcels.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No courier parcels recorded for you.", color = TextMuted)
+                }
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    contentPadding = PaddingValues(bottom = 24.dp)
+                ) {
                     items(parcels) { parcel ->
+                        val isReady = parcel.status.lowercase() == "ready for pickup"
+                        val isCollected = parcel.status.lowercase() == "collected"
+
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = DarkCardSurface)
+                            shape = RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(containerColor = DarkCardSurface),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Text(parcel.sender ?: "Courier Parcel", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
-                                    Text(parcel.description ?: "Package at Main Gate", style = MaterialTheme.typography.bodySmall, color = TextMuted)
-                                }
-                                Surface(
-                                    color = Color(0xFF1E1B4B),
-                                    shape = RoundedCornerShape(8.dp)
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        parcel.status,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = AccentPurple,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(42.dp)
+                                                .clip(CircleShape)
+                                                .background(
+                                                    if (isReady) StatusGreen.copy(alpha = 0.2f)
+                                                    else if (isCollected) DarkCardSurfaceVariant
+                                                    else AccentPurple.copy(alpha = 0.2f)
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Inventory2,
+                                                contentDescription = null,
+                                                tint = if (isReady) StatusGreen else if (isCollected) TextMuted else AccentPurple,
+                                                modifier = Modifier.size(22.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Column {
+                                            Text(parcel.sender ?: "Courier Package", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = TextPrimary)
+                                            Text(parcel.description ?: "Package at Gate Desk", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                                        }
+                                    }
+
+                                    Surface(
+                                        color = if (isReady) StatusGreen.copy(alpha = 0.2f) else if (isCollected) DarkCardSurfaceVariant else AccentPurple.copy(alpha = 0.2f),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text(
+                                            text = parcel.status.uppercase(),
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = if (isReady) StatusGreen else if (isCollected) TextMuted else AccentPurple,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                }
+
+                                parcel.arrivedAt?.let { arr ->
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Text("Logged by Security Gate: $arr", style = MaterialTheme.typography.labelSmall, color = TextCyan)
+                                }
+
+                                if (isReady) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Surface(
+                                        color = StatusGreen.copy(alpha = 0.15f),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(Icons.Default.Verified, contentDescription = null, tint = StatusGreen, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Package arrived! Show your Student ID at Main Gate Security to collect.", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = StatusGreen)
+                                        }
+                                    }
                                 }
                             }
                         }
