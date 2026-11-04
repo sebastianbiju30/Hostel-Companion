@@ -30,6 +30,7 @@ create table if not exists profiles (
   role text not null default 'student' check (role in ('student','admin','warden')),
   room_id uuid references rooms(id) on delete set null,
   avatar_url text,
+  is_admin boolean not null default false,
   created_at timestamptz default now()
 );
 
