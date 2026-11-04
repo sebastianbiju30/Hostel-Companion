@@ -876,27 +876,79 @@ fun StepItem(label: String, isCompleted: Boolean, isActive: Boolean) {
 
 @Composable
 fun MessMealItem(title: String, menu: String, time: String, calories: String, isCurrent: Boolean) {
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(if (isCurrent) AccentBlueLight else TextMuted)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column {
-                Text(title, style = MaterialTheme.typography.titleSmall, color = if (isCurrent) AccentBlueLight else TextPrimary)
-                Text(menu, style = MaterialTheme.typography.bodySmall, color = TextMuted)
-                Spacer(modifier = Modifier.height(2.dp))
-                Text("🔥 $calories", style = MaterialTheme.typography.labelSmall, color = AccentAmber)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(9.dp)
+                        .clip(CircleShape)
+                        .background(if (isCurrent) AccentTeal else TextMuted.copy(alpha = 0.5f))
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = if (isCurrent) AccentTeal else TextPrimary
+                )
+                if (isCurrent) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Surface(
+                        color = AccentTeal.copy(alpha = 0.18f),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = "NOW",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 9.sp
+                            ),
+                            color = AccentTeal,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                        )
+                    }
+                }
+            }
+
+            Surface(
+                color = DarkCardSurfaceVariant,
+                shape = RoundedCornerShape(6.dp)
+            ) {
+                Text(
+                    text = time,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                    color = TextCyan,
+                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                    maxLines = 1,
+                    softWrap = false
+                )
             }
         }
-        Text(time, style = MaterialTheme.typography.labelSmall, color = TextMuted)
+
+        Text(
+            text = menu,
+            style = MaterialTheme.typography.bodySmall.copy(lineHeight = 18.sp),
+            color = TextMuted,
+            modifier = Modifier.padding(start = 17.dp)
+        )
+
+        Row(
+            modifier = Modifier.padding(start = 17.dp, top = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "🔥 $calories",
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 11.sp),
+                color = AccentAmber
+            )
+        }
     }
 }
 

@@ -142,3 +142,4 @@ class HostelLocalDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE
         return db.delete(TABLE_TASKS, "$COLUMN_ID = ?", arrayOf(id.toString()))
     }
 }
+

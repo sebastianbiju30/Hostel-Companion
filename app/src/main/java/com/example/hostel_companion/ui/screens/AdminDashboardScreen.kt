@@ -603,10 +603,30 @@ fun WardenMessMenuView(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("${meal.day} • ${meal.meal}", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = AccentAmber)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(meal.serveTime ?: "", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    "${meal.day} • ${meal.meal}",
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = AccentAmber
+                                )
+                                if (!meal.serveTime.isNullOrBlank()) {
+                                    Surface(
+                                        color = DarkCardSurfaceVariant,
+                                        shape = RoundedCornerShape(4.dp)
+                                    ) {
+                                        Text(
+                                            meal.serveTime,
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                            color = TextCyan,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                            maxLines = 1,
+                                            softWrap = false
+                                        )
+                                    }
+                                }
                             }
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(meal.items ?: "Menu to be filled", style = MaterialTheme.typography.bodySmall, color = TextPrimary)
