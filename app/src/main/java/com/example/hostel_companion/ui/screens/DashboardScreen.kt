@@ -21,15 +21,22 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.hostel_companion.data.SupabaseProvider
+import com.example.hostel_companion.data.local.HostelLocalDbHelper
+import com.example.hostel_companion.data.local.LocalTask
 import com.example.hostel_companion.data.models.*
 import com.example.hostel_companion.data.repository.HostelRepository
 import com.example.hostel_companion.ui.theme.*
 import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun DashboardScreen(navController: NavController) {
@@ -57,9 +64,16 @@ fun DashboardScreen(navController: NavController) {
     var emergencyContacts by remember { mutableStateOf<List<EmergencyContact>>(emptyList()) }
     var isUserAdmin by remember { mutableStateOf(false) }
 
+    val localDbHelper = remember { HostelLocalDbHelper.getInstance(context) }
+    var localTasks by remember { mutableStateOf<List<LocalTask>>(emptyList()) }
+    fun reloadLocalTasks() {
+        localTasks = localDbHelper.getAllTasks()
+    }
+
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
+        reloadLocalTasks()
         HostelRepository.refreshFromSupabase()
         scope.launch {
             try {
@@ -168,15 +182,26 @@ fun DashboardScreen(navController: NavController) {
 
             // 2. GREETING TEXT
             item {
+                val formattedDate = remember {
+                    SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(Date())
+                }
+                val currentHour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
+                val greetingPrefix = when (currentHour) {
+                    in 5..11 -> "Good Morning"
+                    in 12..16 -> "Good Afternoon"
+                    in 17..21 -> "Good Evening"
+                    else -> "Good Night"
+                }
+
                 Column {
                     Text(
-                        text = "Friday, August 28",
+                        text = formattedDate,
                         style = MaterialTheme.typography.bodyMedium,
                         color = TextCyan
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Good Morning, $userName 👋",
+                        text = "$greetingPrefix, $userName 👋",
                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                         color = TextPrimary
                     )
@@ -323,6 +348,113 @@ fun DashboardScreen(navController: NavController) {
                 }
             }
 
+            // 4b. PERSONAL ROOM NOTES & CHECKLIST (LOCAL SQLITE DB)
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Personal Notes & Tasks",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = TextPrimary
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Surface(
+                                color = AccentTeal.copy(alpha = 0.2f),
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Text(
+                                    text = "OFFLINE DB",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.sp),
+                                    color = AccentTeal,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Text(
+                            text = "Manage All >",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextCyan,
+                            modifier = Modifier.clickable { navController.navigate("notes") }
+                        )
+                    }
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.cardColors(containerColor = DarkCardSurface)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            if (localTasks.isEmpty()) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { navController.navigate("notes") }
+                                        .padding(vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null, tint = AccentTeal)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Add your first room task or offline reminder...", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                                }
+                            } else {
+                                localTasks.take(3).forEachIndexed { idx, task ->
+                                    if (idx > 0) {
+                                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = DarkCardSurfaceVariant)
+                                    }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Checkbox(
+                                            checked = task.isCompleted,
+                                            onCheckedChange = { isChecked ->
+                                                localDbHelper.toggleTask(task.id, isChecked)
+                                                reloadLocalTasks()
+                                            },
+                                            colors = CheckboxDefaults.colors(
+                                                checkedColor = StatusGreen,
+                                                uncheckedColor = TextMuted,
+                                                checkmarkColor = Color.White
+                                            )
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = task.title,
+                                                style = MaterialTheme.typography.bodyMedium.copy(
+                                                    fontWeight = FontWeight.Medium,
+                                                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None
+                                                ),
+                                                color = if (task.isCompleted) TextMuted else TextPrimary
+                                            )
+                                            if (task.description.isNotBlank()) {
+                                                Text(task.description, style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                                            }
+                                        }
+                                        Surface(
+                                            color = DarkCardSurfaceVariant,
+                                            shape = RoundedCornerShape(6.dp)
+                                        ) {
+                                            Text(
+                                                text = task.category,
+                                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                                color = AccentTeal,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // 5. ACTIVE COMPLAINT STEPPER CARD
             item {
                 val complaintTitle = activeComplaint?.title ?: "AC Not Cooling (Ref #204)"
@@ -397,6 +529,19 @@ fun DashboardScreen(navController: NavController) {
 
             // 6. TODAY'S MESS MENU
             item {
+                val todayName = remember { SimpleDateFormat("EEEE", Locale.US).format(Date()) }
+                val todayMeals = allMessMenu.filter { it.day.equals(todayName, ignoreCase = true) }
+                val breakfast = todayMeals.firstOrNull { it.meal.equals("Breakfast", true) }
+                val lunch = todayMeals.firstOrNull { it.meal.equals("Lunch", true) }
+                val snacks = todayMeals.firstOrNull { it.meal.equals("Snacks", true) }
+                val dinner = todayMeals.firstOrNull { it.meal.equals("Dinner", true) }
+
+                val currentHour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
+                val isBreakfastCurrent = currentHour in 6..10
+                val isLunchCurrent = currentHour in 11..14
+                val isSnacksCurrent = currentHour in 15..17
+                val isDinnerCurrent = currentHour in 18..23
+
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -404,7 +549,7 @@ fun DashboardScreen(navController: NavController) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Today's Mess Menu",
+                            text = "Today's Mess Menu ($todayName)",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = TextPrimary
                         )
@@ -424,13 +569,37 @@ fun DashboardScreen(navController: NavController) {
                         colors = CardDefaults.cardColors(containerColor = DarkCardSurface)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            MessMealItem("Breakfast", "Poha, Boiled Eggs, Tea", "07:30 AM", "450 kcal", isCurrent = false)
+                            MessMealItem(
+                                "Breakfast",
+                                breakfast?.items ?: "Aloo Paratha with Curd, Tea / Coffee",
+                                breakfast?.serveTime ?: "07:30 AM - 09:30 AM",
+                                "${breakfast?.calories ?: 480} kcal",
+                                isCurrent = isBreakfastCurrent
+                            )
                             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = DarkCardSurfaceVariant)
-                            MessMealItem("Lunch", "Rice, Dal, Paneer Masala", "12:30 PM", "850 kcal", isCurrent = true)
+                            MessMealItem(
+                                "Lunch",
+                                lunch?.items ?: "Rajma Masala, Steamed Rice, Phulka, Salad",
+                                lunch?.serveTime ?: "12:30 PM - 02:30 PM",
+                                "${lunch?.calories ?: 760} kcal",
+                                isCurrent = isLunchCurrent
+                            )
                             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = DarkCardSurfaceVariant)
-                            MessMealItem("Snacks", "Samosa, Coffee", "05:00 PM", "320 kcal", isCurrent = false)
+                            MessMealItem(
+                                "Snacks",
+                                snacks?.items ?: "Hot Veg Cutlet / Samosa, Masala Chai",
+                                snacks?.serveTime ?: "05:00 PM - 06:00 PM",
+                                "${snacks?.calories ?: 320} kcal",
+                                isCurrent = isSnacksCurrent
+                            )
                             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = DarkCardSurfaceVariant)
-                            MessMealItem("Dinner", "Chapati, Veg Curry", "08:00 PM", "650 kcal", isCurrent = false)
+                            MessMealItem(
+                                "Dinner",
+                                dinner?.items ?: "Paneer Dish, Yellow Dal Fry, Tawa Roti, Dessert",
+                                dinner?.serveTime ?: "07:30 PM - 09:30 PM",
+                                "${dinner?.calories ?: 680} kcal",
+                                isCurrent = isDinnerCurrent
+                            )
                         }
                     }
                 }

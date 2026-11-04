@@ -509,7 +509,7 @@ fun WardenComplaintsView(
                                         containerColor = if (isCurrent) AccentAmber.copy(alpha = 0.2f) else Color.Transparent,
                                         contentColor = if (isCurrent) AccentAmber else TextMuted
                                     ),
-                                    border = ButtonDefaults.outlinedButtonBorder.copy(
+                                    border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(
                                         brush = androidx.compose.ui.graphics.SolidColor(if (isCurrent) AccentAmber else DarkCardSurfaceVariant)
                                     ),
                                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)

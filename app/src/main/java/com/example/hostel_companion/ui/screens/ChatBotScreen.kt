@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.hostel_companion.data.SupabaseProvider
+import com.example.hostel_companion.data.local.HostelLocalDbHelper
 import com.example.hostel_companion.data.models.*
 import com.example.hostel_companion.ui.theme.*
 import io.github.jan.supabase.postgrest.from
@@ -350,6 +351,41 @@ fun ChatBotScreen(navController: NavController? = null) {
                 )
             }
 
+            // 7b. PERSONAL ROOM NOTES & CHECKLIST (LOCAL SQLITE DB)
+            q.contains("note") || q.contains("task") || q.contains("checklist") ||
+            q.contains("todo") || q.contains("reminder") -> {
+                val dbHelper = HostelLocalDbHelper.getInstance(context)
+                val localTasks = dbHelper.getAllTasks()
+                val pending = localTasks.filter { !it.isCompleted }
+                val completed = localTasks.filter { it.isCompleted }
+
+                val sb = StringBuilder("📝 **Your Personal Room Notes & Checklist (Offline DB):**\n\n")
+                if (localTasks.isEmpty()) {
+                    sb.append("You don't have any saved notes or reminders yet.\n\nYou can add custom checklists, laundry pickup reminders, or study tasks saved privately on your device.")
+                } else {
+                    sb.append("• **Total Tasks**: ${localTasks.size} (${completed.size} completed, ${pending.size} pending)\n\n")
+                    if (pending.isNotEmpty()) {
+                        sb.append("📌 **Pending Reminders:**\n")
+                        pending.take(4).forEach { t ->
+                            sb.append("• [ ] **${t.title}** (${t.category})\n")
+                            if (t.description.isNotBlank()) sb.append("  ℹ️ ${t.description}\n")
+                        }
+                    }
+                    if (completed.isNotEmpty()) {
+                        sb.append("\n✅ **Completed Tasks:**\n")
+                        completed.take(2).forEach { t ->
+                            sb.append("• [✓] ~~${t.title}~~\n")
+                        }
+                    }
+                }
+                ChatMessage(
+                    text = sb.toString().trim(),
+                    isUser = false,
+                    actionLabel = "Open Personal Notes",
+                    actionRoute = "notes"
+                )
+            }
+
             // 8. EMERGENCY CONTACTS & WARDEN
             q.contains("emergency") || q.contains("warden") || q.contains("doctor") ||
             q.contains("ambulance") || q.contains("security") || q.contains("police") ||
@@ -444,6 +480,7 @@ fun ChatBotScreen(navController: NavController? = null) {
     val promptSuggestions = listOf(
         "🍽️ Today's Mess Menu",
         "🔧 Check My Complaints",
+        "📝 My Room Notes",
         "📢 Latest Notices",
         "👕 Laundry Status",
         "📦 My Parcels",

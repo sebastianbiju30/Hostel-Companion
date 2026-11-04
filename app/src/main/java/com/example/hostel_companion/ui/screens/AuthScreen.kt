@@ -452,7 +452,7 @@ fun AuthScreen(
                     .height(50.dp),
                 enabled = !isLoading,
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
-                border = ButtonDefaults.outlinedButtonBorder.copy(
+                border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(
                     brush = androidx.compose.ui.graphics.SolidColor(DarkCardSurfaceVariant)
                 )
             ) {

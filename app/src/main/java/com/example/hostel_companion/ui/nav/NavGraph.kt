@@ -124,6 +124,9 @@ fun HostelNavGraph() {
             composable("chatbot") {
                 ChatBotScreen(navController = navController)
             }
+            composable("notes") {
+                PersonalNotesScreen(navController = navController)
+            }
             composable("profile") {
                 ProfileScreen(
                     navController = navController,
