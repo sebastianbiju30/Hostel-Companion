@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -30,13 +31,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import com.example.hostel_companion.data.SupabaseProvider
+import com.example.hostel_companion.data.ml.HostelMlEngine
 import com.example.hostel_companion.data.models.Complaint
 import com.example.hostel_companion.data.models.UserProfile
 import com.example.hostel_companion.data.repository.HostelRepository
+import com.example.hostel_companion.ui.components.MlLabDialog
 import com.example.hostel_companion.ui.theme.*
 import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.Dispatchers
@@ -58,6 +62,7 @@ fun ComplaintsScreen() {
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategoryFilter by remember { mutableStateOf("All") }
     var previewImageUrl by remember { mutableStateOf<String?>(null) }
+    var showMlLabDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     val categories = listOf("All", "Electrical", "Plumbing", "AC", "Furniture", "Cleanliness", "Internet", "Other")
@@ -114,6 +119,9 @@ fun ComplaintsScreen() {
                     containerColor = DarkCardSurface
                 ),
                 actions = {
+                    IconButton(onClick = { showMlLabDialog = true }) {
+                        Icon(Icons.Default.Science, contentDescription = "ML Lab", tint = AccentTeal)
+                    }
                     IconButton(onClick = { HostelRepository.refreshFromSupabase() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = TextPrimary)
                     }
@@ -308,6 +316,11 @@ fun ComplaintsScreen() {
                     }
                 )
             }
+
+            // Machine Learning Laboratory Dialog
+            if (showMlLabDialog) {
+                MlLabDialog(onDismiss = { showMlLabDialog = false })
+            }
         }
     }
 }
@@ -319,6 +332,10 @@ fun ComplaintCard(
     onImageClick: (String) -> Unit = {},
     onStatusUpdate: (String) -> Unit = {}
 ) {
+    val mlTriage = remember(complaint.title, complaint.description) {
+        HostelMlEngine.classifyComplaint(complaint.title, complaint.description)
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -330,7 +347,7 @@ fun ComplaintCard(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -341,11 +358,27 @@ fun ComplaintCard(
                         overflow = TextOverflow.Ellipsis
                     )
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "Category: ${complaint.category}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = AccentTeal
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Category: ${complaint.category}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AccentTeal
+                        )
+                        Surface(
+                            color = Color(mlTriage.urgencyColorHex).copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = "⚡ ML: ${mlTriage.urgencyLevel} (${mlTriage.estimatedResolutionHours}h SLA)",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                                color = Color(mlTriage.urgencyColorHex),
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 StatusBadge(status = complaint.status)
@@ -587,6 +620,75 @@ fun AddComplaintDialog(
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                // Real-time AI / ML Auto-Triage Card
+                val mlResult = remember(title, desc) { HostelMlEngine.classifyComplaint(title, desc) }
+                AnimatedVisibility(visible = title.isNotBlank() || desc.isNotBlank()) {
+                    Surface(
+                        color = DarkBackground,
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, AccentBlueLight.copy(alpha = 0.35f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.AutoAwesome,
+                                        contentDescription = null,
+                                        tint = AccentBlueLight,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        "ML Auto-Triage",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = AccentBlueLight
+                                    )
+                                }
+
+                                Surface(
+                                    color = Color(mlResult.urgencyColorHex).copy(alpha = 0.2f),
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        text = "${mlResult.urgencyLevel} RISK (${mlResult.estimatedResolutionHours}h SLA)",
+                                        color = Color(mlResult.urgencyColorHex),
+                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Predicted: ${mlResult.predictedCategory} (${(mlResult.confidenceScore * 100).toInt()}%)",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                                    color = TextPrimary
+                                )
+
+                                if (selectedCategory != mlResult.predictedCategory && mlResult.predictedCategory != "Other") {
+                                    TextButton(
+                                        onClick = { selectedCategory = mlResult.predictedCategory },
+                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
+                                    ) {
+                                        Text("Apply ML", color = TextCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
 
                 // Category Selection
                 ExposedDropdownMenuBox(

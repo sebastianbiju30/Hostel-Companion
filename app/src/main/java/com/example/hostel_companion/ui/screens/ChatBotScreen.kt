@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.hostel_companion.data.SupabaseProvider
 import com.example.hostel_companion.data.local.HostelLocalDbHelper
+import com.example.hostel_companion.data.ml.HostelMlEngine
 import com.example.hostel_companion.data.models.*
 import com.example.hostel_companion.ui.theme.*
 import io.github.jan.supabase.postgrest.from
@@ -169,6 +170,44 @@ fun ChatBotScreen(navController: NavController? = null) {
         val q = query.lowercase().trim()
 
         return when {
+            // 0. MACHINE LEARNING & NLP TRIAGE ENGINE
+            q.contains("ml") || q.contains("machine learning") || q.contains("triage") ||
+            q.contains("model") || q.contains("classify") || q.contains("predict") ||
+            q.contains("algorithm") || q.contains("naive bayes") || q.contains("nlp") -> {
+                val queryToClassify = when {
+                    q.contains(":") -> query.substringAfter(":").trim()
+                    q.contains("classify") -> query.substringAfter("classify").trim()
+                    q.contains("predict") -> query.substringAfter("predict").trim()
+                    else -> "Water leaking from ceiling into electrical socket with sparks"
+                }.ifBlank { "Water leaking from ceiling into electrical socket with sparks" }
+
+                val mlResult = HostelMlEngine.classifyComplaint(queryToClassify)
+                val messPred = HostelMlEngine.predictMessConsumption("Dinner", "Wednesday", "Paneer Butter Masala, Dal, Rice")
+
+                val sb = StringBuilder("🔬 **Hostel Companion Machine Learning Engine:**\n\n")
+                sb.append("This application features **2 On-Device Machine Learning Models**:\n\n")
+                sb.append("1️⃣ **Multinomial Naive Bayes NLP Classifier + TF-IDF**:\n")
+                sb.append("   • Automatically categorizes maintenance complaints and predicts incident severity.\n")
+                sb.append("   • **Sample Query Tested**: *\"$queryToClassify\"*\n")
+                sb.append("   • **Predicted Category**: **${mlResult.predictedCategory}** (${(mlResult.confidenceScore * 100).toInt()}% confidence)\n")
+                sb.append("   • **Urgency Severity**: **${mlResult.urgencyLevel}** (ETA: ${mlResult.estimatedResolutionHours}h SLA)\n")
+                if (mlResult.detectedKeywords.isNotEmpty()) {
+                    sb.append("   • **Detected Signal Tokens**: ${mlResult.detectedKeywords.joinToString(", ")}\n")
+                }
+                sb.append("\n2️⃣ **Mess Footfall Regression Model**:\n")
+                sb.append("   • Predicts dining attendance based on meal type & dish popularity vectors.\n")
+                sb.append("   • **Today's Dinner Turnout**: **${messPred.predictedAttendancePercent}%** (~${messPred.expectedStudentCount} students)\n")
+                sb.append("   • **Food Waste Risk**: **${messPred.foodWasteRisk}**\n\n")
+                sb.append("💡 *Try typing `classify: your problem` to test any sentence, or open the ML Lab in the Complaints screen!*")
+
+                ChatMessage(
+                    text = sb.toString().trim(),
+                    isUser = false,
+                    actionLabel = "Open ML Complaints Lab",
+                    actionRoute = "complaints"
+                )
+            }
+
             // 1. MESS MENU & FOOD
             q.contains("mess") || q.contains("food") || q.contains("menu") ||
             q.contains("lunch") || q.contains("dinner") || q.contains("breakfast") ||
@@ -478,6 +517,7 @@ fun ChatBotScreen(navController: NavController? = null) {
     }
 
     val promptSuggestions = listOf(
+        "🔬 Run ML Triage",
         "🍽️ Today's Mess Menu",
         "🔧 Check My Complaints",
         "📝 My Room Notes",
